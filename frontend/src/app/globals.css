@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+/* Class-based dark mode (Tailwind v4): dark: utilities apply when an
+   ancestor has class="dark", toggled by ThemeToggle and persisted to
+   localStorage -- not just prefers-color-scheme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  /* Light theme -- same semantic roles as dark, tuned for contrast on white. */
+  --void: #f7f9fc;
+  --deep: #ffffff;
+  --surface: #eef1f6;
+  --panel: #ffffff;
+  --border: #e2e8f0;
+  --accent: #0089a8;
+  --accent-dim: #00708a;
+  --danger: #dc2626;
+  --warn: #b45309;
+  --safe: #15803d;
+  --iris: #6d28d9;
+  --text: #0f172a;
+  --muted: #64748b;
+}
+
+.dark {
+  /* Exact palette from the prototype (github.com/profyk/The-Eye) */
+  --void: #07090f;
+  --deep: #0d1117;
+  --surface: #111827;
+  --panel: #151c2c;
+  --border: #1e2d45;
+  --accent: #00d4ff;
+  --accent-dim: #0099bb;
+  --danger: #ff3b3b;
+  --warn: #ffb800;
+  --safe: #00e676;
+  --iris: #7b6fff;
+  --text: #e8edf5;
+  --muted: #5a6a80;
+}
+
+@theme inline {
+  --color-void: var(--void);
+  --color-deep: var(--deep);
+  --color-surface: var(--surface);
+  --color-panel: var(--panel);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-dim: var(--accent-dim);
+  --color-danger: var(--danger);
+  --color-warn: var(--warn);
+  --color-safe: var(--safe);
+  --color-iris: var(--iris);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+
+  /* Kept for next/font CSS variables wired in layout.tsx. */
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--void);
+  color: var(--text);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease;
+}
+
+.animate-blink {
+  animation: blink 1s infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s infinite;
+}
+
+/* Thin, panel-colored scrollbar, matching the prototype. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+/* "Export" for reports is just the browser's own Print/Save-as-PDF -- no
+   server-side PDF generation, no new dependency. .no-print hides chrome
+   (nav, action buttons) so only the report content ends up on paper/PDF. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
