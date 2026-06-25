@@ -68,11 +68,29 @@ async def submit_whistleblower_report(
 
 
 @router.get(
+    "/reports",
+    response_model=list[WhistleblowerReportRead],
+    dependencies=[Depends(require_role("admin", "investigator"))],
+)
+async def list_whistleblower_reports(db: AsyncSession = Depends(get_db)) -> list[WhistleblowerReportRead]:
+    rows = (await db.execute(select(WhistleblowerReport).order_by(WhistleblowerReport.created_at.desc()))).scalars().all()
+    return [WhistleblowerReportRead.model_validate(r) for r in rows]
+
+
+@router.get(
     "/reports/{report_id}",
     response_model=WhistleblowerReportRead,
     dependencies=[Depends(require_role("admin", "investigator"))],
 )
 async def get_whistleblower_report(report_id: UUID, db: AsyncSession = Depends(get_db)) -> WhistleblowerReportRead:
+    # Known Phase 1 gap, not an oversight: WhistleblowerReport has no
+    # tenant_id (the public submission form has no tenant selector yet --
+    # that's a frontend addition for a later phase), so this can't be
+    # tenant-scoped without first deciding how an anonymous, unauthenticated
+    # submitter identifies which business they're reporting about. Today,
+    # every report is attributed to the bootstrap tenant; any admin/
+    # investigator (of any tenant) can read any report_id by UUID. Close
+    # this before relying on it with more than one real tenant active.
     report = (
         await db.execute(select(WhistleblowerReport).where(WhistleblowerReport.id == report_id))
     ).scalar_one_or_none()

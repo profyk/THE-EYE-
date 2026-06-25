@@ -11,8 +11,10 @@ from app.api.v1 import (
     forensics,
     intrusion,
     investigate,
+    platform,
     sources,
     stats,
+    tenants,
     users,
     whistleblower,
 )
@@ -61,6 +63,8 @@ app.include_router(deletion_requests.router)
 app.include_router(investigate.router)
 app.include_router(whistleblower.router)
 app.include_router(intrusion.router)
+app.include_router(tenants.router)
+app.include_router(platform.router)
 
 
 @app.get("/healthz")

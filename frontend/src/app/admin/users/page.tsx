@@ -5,7 +5,7 @@ import NavBar from "@/components/NavBar";
 import Button from "@/components/Button";
 import { useRequireAuth } from "@/lib/useRequireAuth";
 import { getSession } from "@/lib/auth";
-import { createUser, deactivateUser, listUsers, ApiError, UserRead } from "@/lib/api-client";
+import { createUser, deactivateUser, listUsers, resetUserPassword, ApiError, UserRead } from "@/lib/api-client";
 
 const ROLES = ["admin", "investigator", "chief_auditor", "compliance_officer", "security_officer", "executive_authority"];
 
@@ -22,6 +22,8 @@ export default function UsersAdminPage() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("investigator");
   const [creating, setCreating] = useState(false);
+  const [resettingId, setResettingId] = useState<string | null>(null);
+  const [resetPasswords, setResetPasswords] = useState<Record<string, string>>({});
 
   function refresh() {
     listUsers()
@@ -69,6 +71,18 @@ export default function UsersAdminPage() {
       refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to deactivate user");
+    }
+  }
+
+  async function handleResetPassword(id: string) {
+    const pw = resetPasswords[id] ?? "";
+    if (pw.length < 8) return;
+    try {
+      await resetUserPassword(id, pw);
+      setResettingId(null);
+      setResetPasswords((prev) => { const next = { ...prev }; delete next[id]; return next; });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to reset password");
     }
   }
 
@@ -133,14 +147,49 @@ export default function UsersAdminPage() {
                   <td className="py-2.5 px-3">{u.is_active ? "Active" : "Deactivated"}</td>
                   <td className="py-2.5 px-3 text-muted">{new Date(u.created_at).toLocaleDateString()}</td>
                   <td className="py-2.5 px-3">
-                    {u.is_active && (
-                      <button
-                        onClick={() => handleDeactivate(u.id)}
-                        className="text-danger hover:underline text-xs font-semibold cursor-pointer"
-                      >
-                        Deactivate
-                      </button>
-                    )}
+                    <div className="flex flex-col gap-1.5">
+                      {u.is_active && (
+                        <button
+                          onClick={() => handleDeactivate(u.id)}
+                          className="text-danger hover:underline text-xs font-semibold cursor-pointer text-left"
+                        >
+                          Deactivate
+                        </button>
+                      )}
+                      {resettingId === u.id ? (
+                        <div className="flex gap-1.5 items-center">
+                          <input
+                            type="password"
+                            className="border border-border bg-surface text-text rounded px-2 py-1 text-xs w-32 focus:outline-none focus:ring-1 focus:ring-accent/40"
+                            placeholder="New password"
+                            minLength={8}
+                            value={resetPasswords[u.id] ?? ""}
+                            onChange={(e) => setResetPasswords((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => handleResetPassword(u.id)}
+                            disabled={(resetPasswords[u.id] ?? "").length < 8}
+                            className="text-xs font-semibold text-accent hover:underline disabled:opacity-40 cursor-pointer"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setResettingId(null)}
+                            className="text-xs text-muted hover:underline cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setResettingId(u.id)}
+                          className="text-accent hover:underline text-xs font-semibold cursor-pointer text-left"
+                        >
+                          Reset password
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

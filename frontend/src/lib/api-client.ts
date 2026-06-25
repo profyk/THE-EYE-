@@ -78,6 +78,13 @@ export async function deactivateUser(id: string): Promise<UserRead> {
   return request<UserRead>(`/v1/users/${id}/deactivate`, { method: "POST" });
 }
 
+export async function resetUserPassword(id: string, newPassword: string): Promise<UserRead> {
+  return request<UserRead>(`/v1/users/${id}/reset-password`, {
+    method: "POST",
+    body: JSON.stringify({ new_password: newPassword }),
+  });
+}
+
 export interface SourceRead {
   id: string;
   name: string;
@@ -90,6 +97,25 @@ export interface SourceRead {
 
 export async function listSources(): Promise<SourceRead[]> {
   return request<SourceRead[]>("/v1/sources");
+}
+
+export interface SourceCreated {
+  id: string;
+  name: string;
+  source_kind: string;
+  api_key: string;
+  api_key_prefix: string;
+}
+
+export async function createSource(name: string, source_kind: string): Promise<SourceCreated> {
+  return request<SourceCreated>("/v1/sources", {
+    method: "POST",
+    body: JSON.stringify({ name, source_kind }),
+  });
+}
+
+export async function deactivateSource(id: string): Promise<SourceRead> {
+  return request<SourceRead>(`/v1/sources/${id}/deactivate`, { method: "POST" });
 }
 
 export interface OverviewStats {
@@ -283,6 +309,10 @@ export interface WhistleblowerReportRead {
   created_at: string;
 }
 
+export async function listWhistleblowerReports(): Promise<WhistleblowerReportRead[]> {
+  return request<WhistleblowerReportRead[]>("/v1/whistleblower/reports");
+}
+
 export async function getWhistleblowerReport(reportId: string): Promise<WhistleblowerReportRead> {
   return request<WhistleblowerReportRead>(`/v1/whistleblower/reports/${reportId}`);
 }
@@ -295,4 +325,74 @@ export async function decideDeletionRequest(
     method: "POST",
     body: JSON.stringify({ decision }),
   });
+}
+
+// ── Analytics ────────────────────────────────────────────────────────────────
+export interface AnalyticsData {
+  total_events: number;
+  events_by_day: { date: string; count: number }[];
+  events_by_category: { category: string; count: number }[];
+  events_by_severity: { severity: string; count: number }[];
+  top_event_types: { event_type: string; count: number }[];
+  outcome_breakdown: { outcome: string; count: number }[];
+  activity_by_hour: { hour: number; count: number }[];
+}
+
+export async function getAnalytics(): Promise<AnalyticsData> {
+  return request<AnalyticsData>("/v1/stats/analytics");
+}
+
+export interface HeatmapCell {
+  day: number;
+  hour: number;
+  count: number;
+}
+
+export async function getActivityHeatmap(): Promise<HeatmapCell[]> {
+  return request<HeatmapCell[]>("/v1/stats/heatmap");
+}
+
+// ── Chain summary ─────────────────────────────────────────────────────────────
+export interface ChainSummary {
+  total_events: number;
+  first_sequence_num: number | null;
+  last_sequence_num: number | null;
+  first_event_at: string | null;
+  last_event_at: string | null;
+}
+
+export async function getChainSummary(): Promise<ChainSummary> {
+  return request<ChainSummary>("/v1/chain/summary");
+}
+
+// ── Alert rules ───────────────────────────────────────────────────────────────
+export interface AlertRule {
+  rule_id: string;
+  name: string;
+  severity: string;
+  description: string;
+  threshold: number;
+  window_minutes?: number;
+  lookback_hours?: number;
+  category_filter: string;
+}
+
+export async function listAlertRules(): Promise<AlertRule[]> {
+  return request<AlertRule[]>("/v1/alerts/rules");
+}
+
+// ── Platform info ─────────────────────────────────────────────────────────────
+export interface PlatformInfo {
+  version: string;
+  env: string;
+  ai_configured: boolean;
+  anthropic_model: string | null;
+  session_ttl_hours: number;
+  max_batch_size: number;
+  max_backdate_days: number;
+  cors_origins: string[];
+}
+
+export async function getPlatformInfo(): Promise<PlatformInfo> {
+  return request<PlatformInfo>("/v1/platform/info");
 }

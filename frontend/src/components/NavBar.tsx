@@ -10,14 +10,19 @@ import ThemeToggle from "@/components/ThemeToggle";
 import EyeLogo from "@/components/EyeLogo";
 
 const APPROVER_ROLES = ["chief_auditor", "compliance_officer", "security_officer", "executive_authority"];
+const REPORT_READER_ROLES = ["admin", "investigator"];
 
 const NAV_ITEMS = [
   { href: "/overview", label: "Overview" },
+  { href: "/analytics", label: "Analytics" },
   { href: "/events", label: "Events" },
   { href: "/timeline", label: "Timeline" },
+  { href: "/activity", label: "Activity" },
   { href: "/users-risk", label: "Users" },
   { href: "/alerts", label: "Alerts" },
+  { href: "/alert-rules", label: "Alert Rules" },
   { href: "/forensics", label: "Forensics" },
+  { href: "/chain", label: "Chain" },
   { href: "/investigate", label: "Investigate" },
   { href: "/access-log", label: "Access Log" },
   { href: "/intrusion-detection", label: "Intrusion" },
@@ -28,6 +33,7 @@ export default function NavBar() {
   const pathname = usePathname();
   const session = getSession();
   const canSeeDeletionRequests = session?.role === "admin" || APPROVER_ROLES.includes(session?.role ?? "");
+  const canSeeWhistleblowerReports = session?.role && REPORT_READER_ROLES.includes(session.role);
   const [criticalCount, setCriticalCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -48,7 +54,10 @@ export default function NavBar() {
   const items = [
     ...NAV_ITEMS,
     ...(canSeeDeletionRequests ? [{ href: "/admin/deletion-requests", label: "Deletion Requests" }] : []),
+    ...(canSeeWhistleblowerReports ? [{ href: "/admin/whistleblower", label: "Reports" }] : []),
+    ...(session?.role === "admin" ? [{ href: "/admin/sources", label: "Sources" }] : []),
     ...(session?.role === "admin" ? [{ href: "/admin/users", label: "Manage Users" }] : []),
+    ...(session?.role === "admin" ? [{ href: "/settings", label: "Settings" }] : []),
   ];
 
   return (
