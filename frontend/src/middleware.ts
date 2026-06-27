@@ -14,7 +14,19 @@ export function middleware(request: NextRequest) {
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
     `connect-src 'self' ${API_ORIGIN}`,
     "img-src 'self' data:",
+    // 'unsafe-inline' for styles is a known Next.js limitation: inline style
+    // attributes are used throughout React for dynamic values and cannot be
+    // replaced with nonces on a per-style basis without invasive changes.
+    // Mitigated by the strict script-src (no inline JS without a nonce) and
+    // frame-ancestors/CORP headers blocking cross-origin loading.
     "style-src 'self' 'unsafe-inline'",
+    "font-src 'self'",
+    // Disallow plugins (Flash, etc) and object/embed tags entirely.
+    "object-src 'none'",
+    // Prevent <base> tag injection from redirecting relative URLs.
+    "base-uri 'self'",
+    // Restrict where forms can submit to -- prevents data exfil via hidden forms.
+    "form-action 'self'",
     "frame-ancestors 'none'",
   ].join("; ");
 

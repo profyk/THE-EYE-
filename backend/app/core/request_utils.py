@@ -17,22 +17,24 @@ def _as_valid_ip(value: str | None) -> str | None:
     return value
 
 
-def get_client_ip(request: Request) -> str | None:
-    """Best-effort real client IP behind a reverse proxy/tunnel. Checked in
-    order of trustworthiness for our deployment: Cloudflare's own header (most
-    reliable when actually behind Cloudflare), then the generic X-Forwarded-For
-    convention most proxies set, then the raw socket peer as a last resort
-    (which behind any proxy is just the proxy's own address, not the real
-    client -- still better than nothing)."""
-    cf_ip = _as_valid_ip(request.headers.get("CF-Connecting-IP", "").strip() or None)
-    if cf_ip:
-        return cf_ip
+def get_client_ip(request: Request, *, trust_proxy: bool = True) -> str | None:
+    """Best-effort real client IP behind a reverse proxy/tunnel.
 
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        forwarded_ip = _as_valid_ip(forwarded.split(",")[0].strip())
-        if forwarded_ip:
-            return forwarded_ip
+    trust_proxy=True (default): check Cloudflare's CF-Connecting-IP first
+    (authoritative when behind Cloudflare), then X-Forwarded-For, then the raw
+    socket peer. Set trust_proxy=False when the API is exposed directly to the
+    internet without any proxy, so an attacker cannot spoof these headers to
+    rotate their apparent IP and bypass IP-keyed rate limits."""
+    if trust_proxy:
+        cf_ip = _as_valid_ip(request.headers.get("CF-Connecting-IP", "").strip() or None)
+        if cf_ip:
+            return cf_ip
+
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            forwarded_ip = _as_valid_ip(forwarded.split(",")[0].strip())
+            if forwarded_ip:
+                return forwarded_ip
 
     if request.client:
         return _as_valid_ip(request.client.host)

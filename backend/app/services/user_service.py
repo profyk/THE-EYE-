@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -62,10 +62,18 @@ async def authenticate_user(db: AsyncSession, username: str, password: str) -> U
     return user
 
 
+async def _revoke_all_sessions(db: AsyncSession, user_id: UUID) -> None:
+    await db.execute(delete(Session).where(Session.user_id == user_id))
+
+
 async def set_user_password(db: AsyncSession, user: User, new_password: str) -> User:
     password_hash, salt = hash_password(new_password)
     user.password_hash = password_hash
     user.password_salt = salt
+    # Invalidate every active session so the old password can no longer be
+    # used via a cached token. Legitimate users re-authenticate with the new
+    # password; attackers who had a stolen session token are evicted.
+    await _revoke_all_sessions(db, user.id)
     await db.commit()
     await db.refresh(user)
     return user
@@ -136,6 +144,11 @@ async def deactivate_user(db: AsyncSession, user_id: UUID, *, tenant_id: UUID) -
     if user is None:
         return None
     user.is_active = False
+    # Immediately invalidate every active session -- `get_user_by_session_token`
+    # already checks `is_active`, so sessions would fail on next use anyway, but
+    # explicit deletion avoids leaving stale rows and makes revocation instant
+    # even if the `is_active` check were somehow bypassed.
+    await _revoke_all_sessions(db, user_id)
     await db.commit()
     await db.refresh(user)
     return user

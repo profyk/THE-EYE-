@@ -4,7 +4,9 @@ package shipper
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -57,7 +59,18 @@ func New(cfg *config.Config, q *queue.Queue) *Shipper {
 	}
 }
 
-// Run ships batches in a loop with exponential back-off on errors.
+// jitter returns a random duration in [0, d/2) so multiple agents that
+// restart simultaneously don't all slam the server at the same instant.
+func jitter(d time.Duration) time.Duration {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return 0
+	}
+	n := int64(binary.LittleEndian.Uint64(b[:]) % uint64(d/2))
+	return time.Duration(n)
+}
+
+// Run ships batches in a loop with exponential back-off + jitter on errors.
 func (s *Shipper) Run() {
 	wait := minRetryWait
 	for {
@@ -65,8 +78,9 @@ func (s *Shipper) Run() {
 		if err := s.shipOne(); err != nil {
 			s.errors.Add(1)
 			s.lastErr.Store(err.Error())
-			log.Printf("[shipper] error: %v — retry in %s", err, wait)
-			time.Sleep(wait)
+			sleep := wait + jitter(wait)
+			log.Printf("[shipper] error: %v — retry in %s", err, sleep)
+			time.Sleep(sleep)
 			wait = min(wait*2, maxRetryWait)
 		} else {
 			wait = minRetryWait

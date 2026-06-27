@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, require_role
+from app.config import settings
+from app.core.security import validate_password_strength
 from app.models.user import User
 from app.schemas.user import SetPasswordRequest, UserCreate, UserRead
 from app.services.user_service import (
@@ -24,6 +26,9 @@ async def create_user_endpoint(
 ) -> UserRead:
     if await get_user_by_username(db, data.username) is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Username already exists")
+    err = validate_password_strength(data.password, settings.password_min_length)
+    if err:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, err)
     # Always the caller's own tenant -- never trust a tenant_id in the
     # request body here, or one tenant's admin could create users inside a
     # different tenant by just passing an arbitrary id.
@@ -60,5 +65,8 @@ async def reset_password_endpoint(
     user = await get_user_by_id(db, user_id, tenant_id=caller.tenant_id)
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+    err = validate_password_strength(data.new_password, settings.password_min_length)
+    if err:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, err)
     user = await set_user_password(db, user, data.new_password)
     return UserRead.model_validate(user)

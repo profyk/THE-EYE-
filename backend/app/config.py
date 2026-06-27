@@ -43,5 +43,19 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-6"
 
+    # Security hardening knobs. Sane production defaults; override in .env.
+    # Minimum password length enforced on create and reset -- 12 is NIST SP
+    # 800-63B's recommended floor for subscriber-chosen memorized secrets.
+    password_min_length: int = 12
+    # Global per-IP request cap applied to every API route. This is a
+    # last-resort DoS backstop, not a primary rate limit -- auth endpoints
+    # have tighter per-endpoint limits applied first.
+    global_rate_limit_per_ip: int = 300
+    global_rate_limit_window_seconds: int = 60
+    # Whether to trust X-Forwarded-For / CF-Connecting-IP headers. Set to
+    # False when not behind any proxy (direct-to-internet deployments) to
+    # prevent IP spoofing that defeats IP-keyed rate limits.
+    trust_proxy_headers: bool = True
+
 
 settings = Settings()

@@ -84,8 +84,11 @@ func main() {
 
 	// ── Normal (tray) mode ────────────────────────────────────────────────────
 
-	// Redirect log to a rolling log file — there is no console in windowsgui mode.
+	// Redirect log to a size-capped log file. There is no console in windowsgui
+	// mode. We cap at 10 MB and rotate once: agent.log → agent.log.1, then
+	// start fresh. This keeps total log disk usage under ~20 MB indefinitely.
 	logPath := filepath.Join(dataDir, "agent.log")
+	rotateLogs(logPath, 10<<20) // 10 MB cap
 	logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err == nil {
 		log.SetOutput(logFile)
@@ -152,6 +155,19 @@ func main() {
 	}
 
 	systray.Run(eyetray.OnReady(cfg, q, s, intact), eyetray.OnExit(cfg, q))
+}
+
+// ── Log rotation ─────────────────────────────────────────────────────────────
+
+// rotateLogs renames path → path+".1" when the file exceeds maxBytes,
+// capping total log disk usage at ~2× maxBytes.
+func rotateLogs(path string, maxBytes int64) {
+	info, err := os.Stat(path)
+	if err != nil || info.Size() < maxBytes {
+		return
+	}
+	_ = os.Remove(path + ".1")
+	_ = os.Rename(path, path+".1")
 }
 
 // ── Windows registry startup ──────────────────────────────────────────────────

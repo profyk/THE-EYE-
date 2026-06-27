@@ -1,4 +1,6 @@
 """Minimal in-memory rate limiter -- no new dependency (no Redis/slowapi).
+Used as both a per-endpoint guard (login, whistleblower, ingestion failures)
+and a global per-IP backstop middleware in app.main.
 Good enough for a single-process MVP deployment; not distributed-safe, which
 is an explicitly accepted limitation here, not an oversight. Used by the
 public whistleblower endpoint, dashboard login, and rejected ingestion-key

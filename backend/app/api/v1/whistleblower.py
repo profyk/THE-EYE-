@@ -7,7 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, require_role
+from app.config import settings
 from app.core.rate_limit import check_rate_limit
+from app.core.request_utils import get_client_ip
 from app.ledger.append import append_event
 from app.models.whistleblower_report import WhistleblowerReport
 from app.schemas.event import EventCreate
@@ -32,8 +34,8 @@ async def submit_whistleblower_report(
     lookup -- anonymity is the entire point of this endpoint, not an
     oversight. Rate-limited per source IP only to deter abuse; that IP is
     used in-memory for the rate-limit check and is never stored anywhere."""
-    client_host = request.client.host if request.client else "unknown"
-    if not check_rate_limit(client_host, max_requests=RATE_LIMIT_MAX_REQUESTS, window_seconds=RATE_LIMIT_WINDOW_SECONDS):
+    client_ip = get_client_ip(request, trust_proxy=settings.trust_proxy_headers) or "unknown"
+    if not check_rate_limit(client_ip, max_requests=RATE_LIMIT_MAX_REQUESTS, window_seconds=RATE_LIMIT_WINDOW_SECONDS):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many submissions -- please try again later.")
 
     source = await get_source_by_name(db, WHISTLEBLOWER_SOURCE_NAME)

@@ -64,7 +64,7 @@ async def _log_dashboard_login(
 async def login(
     body: LoginRequest, request: Request, response: Response, db: AsyncSession = Depends(get_db)
 ) -> LoginResponse:
-    client_ip = get_client_ip(request)
+    client_ip = get_client_ip(request, trust_proxy=settings.trust_proxy_headers)
 
     if not check_rate_limit(
         f"login_ip:{client_ip}", max_requests=IP_RATE_LIMIT_MAX_REQUESTS, window_seconds=IP_RATE_LIMIT_WINDOW_SECONDS
@@ -106,7 +106,7 @@ async def login(
         value=token,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="lax",
+        samesite="strict",
         max_age=settings.session_token_ttl_hours * 3600,
         path="/",
     )

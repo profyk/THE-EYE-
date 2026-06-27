@@ -57,6 +57,17 @@ def verify_password(password: str, password_hash_hex: str, salt_hex: str) -> boo
     return hmac.compare_digest(derived, password_hash_hex)
 
 
+def validate_password_strength(password: str, min_length: int) -> str | None:
+    """Returns an error message string if the password fails, None if it passes."""
+    if len(password) < min_length:
+        return f"Password must be at least {min_length} characters."
+    if password.lower() == password:
+        return "Password must contain at least one uppercase letter."
+    if not any(c.isdigit() for c in password):
+        return "Password must contain at least one digit."
+    return None
+
+
 def generate_session_token() -> str:
     return secrets.token_urlsafe(32)
 
