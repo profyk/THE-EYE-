@@ -12,6 +12,7 @@ class AlertAcknowledgment(Base):
     __table_args__ = {"schema": "app"}
 
     alert_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("app.tenants.id"))
     rule_id: Mapped[str] = mapped_column(String(64))
     actor_id: Mapped[str] = mapped_column(String(256))
     status: Mapped[str] = mapped_column(String(16))

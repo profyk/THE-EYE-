@@ -47,7 +47,7 @@ async def _log(db: AsyncSession, *, actor: User, event_type: str, target_id, met
         target_id=str(target_id),
         metadata=metadata,
     )
-    await append_event(db, event, source_id=source.id)
+    await append_event(db, event, source_id=source.id, tenant_id=actor.tenant_id)
     await db.commit()
 
 
@@ -75,7 +75,12 @@ async def create_deletion_request(
     db: AsyncSession = Depends(get_db),
 ) -> DeletionRequestRead:
     request = await create_request(
-        db, requested_by=user, target_type=body.target_type, target_id=body.target_id, reason=body.reason
+        db,
+        requested_by=user,
+        target_type=body.target_type,
+        target_id=body.target_id,
+        reason=body.reason,
+        tenant_id=user.tenant_id,
     )
     await _log(
         db,
@@ -89,10 +94,10 @@ async def create_deletion_request(
 
 @router.get("", response_model=list[DeletionRequestRead])
 async def list_deletion_requests(
-    _: User = Depends(require_role(*VIEW_ROLES)),
+    user: User = Depends(require_role(*VIEW_ROLES)),
     db: AsyncSession = Depends(get_db),
 ) -> list[DeletionRequestRead]:
-    requests = await list_requests(db)
+    requests = await list_requests(db, tenant_id=user.tenant_id)
     return [await _to_read(db, r) for r in requests]
 
 
@@ -103,7 +108,7 @@ async def decide_deletion_request(
     user: User = Depends(require_role(*APPROVER_ROLES)),
     db: AsyncSession = Depends(get_db),
 ) -> DeletionRequestRead:
-    request = await get_request(db, request_id)
+    request = await get_request(db, request_id, tenant_id=user.tenant_id)
     if request is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Deletion request not found")
 

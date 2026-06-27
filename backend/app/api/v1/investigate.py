@@ -1,20 +1,24 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db, require_role
+from uuid import UUID
+
+from app.api.deps import get_db, require_role, require_tenant_id
 from app.schemas.event import EventRead
 from app.schemas.investigate import InvestigateRequest, InvestigateResponse
 from app.services.event_search import search_events_raw
 from app.services.llm_service import LLMNotConfiguredError, extract_search_filters, generate_report
 
-router = APIRouter(prefix="/v1", tags=["investigate"], dependencies=[Depends(require_role("admin", "investigator"))])
+router = APIRouter(prefix="/v1", tags=["investigate"], dependencies=[Depends(require_role("admin", "investigator", "platform_admin"))])
 
 
 @router.post("/investigate", response_model=InvestigateResponse)
-async def investigate(body: InvestigateRequest, db: AsyncSession = Depends(get_db)) -> InvestigateResponse:
+async def investigate(
+    body: InvestigateRequest, db: AsyncSession = Depends(get_db), tenant_id: UUID = Depends(require_tenant_id)
+) -> InvestigateResponse:
     try:
         filters = await extract_search_filters(body.question)
-        rows = await search_events_raw(db, limit=200, **filters)
+        rows = await search_events_raw(db, tenant_id=tenant_id, limit=200, **filters)
         events = [EventRead.model_validate(r) for r in rows]
         report_text = await generate_report(body.question, events)
     except LLMNotConfiguredError:

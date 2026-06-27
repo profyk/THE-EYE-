@@ -32,3 +32,6 @@ prototype-ref/
 
 # TypeScript build cache
 *.tsbuildinfo
+
+# Go agent compiled binary (source only — build locally with agent/build.bat)
+agent/*.exe

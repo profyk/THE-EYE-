@@ -9,6 +9,7 @@ honest, documented limitation, not a gap to hide.
 import asyncio
 from collections import Counter
 from datetime import datetime, timezone
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,13 +47,19 @@ async def log_failed_ingestion_attempt(db: AsyncSession, *, client_ip: str | Non
     await db.commit()
 
 
-async def get_intrusion_stats(db: AsyncSession) -> dict:
+async def get_intrusion_stats(db: AsyncSession, *, tenant_id: UUID) -> dict:
+    # Dashboard-login failures are tagged with the targeted username's real
+    # tenant where resolvable (see app/api/v1/auth.py); ingestion-key
+    # failures never resolve to a user at all and stay on the bootstrap
+    # tenant -- both are covered by the same tenant_id filter here, so a
+    # business owner only ever sees attempts attributable to their own org.
     stmt = (
         select(LedgerEvent)
         .where(
             LedgerEvent.outcome == "failure",
             LedgerEvent.event_category == "authentication",
             LedgerEvent.origin_ip.is_not(None),
+            LedgerEvent.tenant_id == tenant_id,
         )
         .order_by(LedgerEvent.occurred_at.desc())
         .limit(RECENT_ATTEMPTS_LIMIT)

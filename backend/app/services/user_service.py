@@ -11,14 +11,24 @@ from app.core.security import (
     hash_session_token,
     verify_password,
 )
+from app.models.ledger_event import DEFAULT_TENANT_ID
 from app.models.session import Session
 from app.models.user import User
 from app.schemas.user import UserCreate
 
 
 async def create_user(db: AsyncSession, data: UserCreate) -> User:
+    # platform_admin is the only role allowed no tenant at all (see
+    # ck_users_tenant_required_unless_platform_admin); every other role falls
+    # back to the bootstrap tenant if the caller doesn't specify one, so
+    # existing call sites that predate multi-tenancy keep working unchanged.
+    tenant_id = data.tenant_id
+    if tenant_id is None and data.role != "platform_admin":
+        tenant_id = DEFAULT_TENANT_ID
+
     password_hash, salt = hash_password(data.password)
     user = User(
+        tenant_id=tenant_id,
         username=data.username,
         password_hash=password_hash,
         password_salt=salt,
@@ -97,8 +107,15 @@ async def get_user_by_session_token(db: AsyncSession, raw_token: str) -> User | 
     return user
 
 
-async def get_user_by_id(db: AsyncSession, user_id: UUID) -> User | None:
-    return (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+async def get_user_by_id(db: AsyncSession, user_id: UUID, *, tenant_id: UUID | None = None) -> User | None:
+    """tenant_id=None is only safe for internal/system call sites (e.g.
+    resolving the session's own user during auth) that already have another
+    way of establishing trust -- any caller acting on a *different* user's
+    record (admin endpoints) must always pass their own tenant_id."""
+    stmt = select(User).where(User.id == user_id)
+    if tenant_id is not None:
+        stmt = stmt.where(User.tenant_id == tenant_id)
+    return (await db.execute(stmt)).scalar_one_or_none()
 
 
 async def delete_session_by_token(db: AsyncSession, raw_token: str) -> None:
@@ -112,8 +129,10 @@ async def delete_session_by_token(db: AsyncSession, raw_token: str) -> None:
     await db.commit()
 
 
-async def deactivate_user(db: AsyncSession, user_id: UUID) -> User | None:
-    user = await get_user_by_id(db, user_id)
+async def deactivate_user(db: AsyncSession, user_id: UUID, *, tenant_id: UUID) -> User | None:
+    user = (
+        await db.execute(select(User).where(User.id == user_id, User.tenant_id == tenant_id))
+    ).scalar_one_or_none()
     if user is None:
         return None
     user.is_active = False
@@ -122,5 +141,11 @@ async def deactivate_user(db: AsyncSession, user_id: UUID) -> User | None:
     return user
 
 
-async def list_users(db: AsyncSession) -> list[User]:
-    return list((await db.execute(select(User).order_by(User.created_at.desc()))).scalars().all())
+async def list_users(db: AsyncSession, *, tenant_id: UUID | None) -> list[User]:
+    """tenant_id=None means "don't scope" -- only valid for a platform_admin
+    caller (the router enforces that), everyone else always passes their own
+    tenant_id."""
+    stmt = select(User).order_by(User.created_at.desc())
+    if tenant_id is not None:
+        stmt = stmt.where(User.tenant_id == tenant_id)
+    return list((await db.execute(stmt)).scalars().all())

@@ -11,6 +11,7 @@ correctly instead of spawning a new "alert" every poll.
 import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,18 +51,25 @@ def _bucket_start(now: datetime, window_minutes: int) -> datetime:
     return datetime.fromtimestamp(bucket_minutes * 60, tz=timezone.utc)
 
 
-def _make_key(rule_id: str, actor_id: str, bucket: datetime) -> str:
-    raw = f"{rule_id}:{actor_id}:{bucket.isoformat()}"
+def _make_key(rule_id: str, tenant_id: UUID, actor_id: str, bucket: datetime) -> str:
+    # tenant_id is part of the hashed input, not just a separate column on
+    # AlertAcknowledgment, so two tenants with a same-named actor can never
+    # collide on the same key in the first place.
+    raw = f"{rule_id}:{tenant_id}:{actor_id}:{bucket.isoformat()}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-async def _failed_login_alerts(db: AsyncSession, now: datetime) -> list[AlertInstance]:
+async def _failed_login_alerts(db: AsyncSession, now: datetime, *, tenant_id: UUID) -> list[AlertInstance]:
     window_start = now - timedelta(minutes=FAILED_LOGIN_WINDOW_MINUTES)
     bucket = _bucket_start(now, FAILED_LOGIN_WINDOW_MINUTES)
 
     stmt = (
         select(LedgerEvent.actor_id, func.count().label("failed_count"))
-        .where(LedgerEvent.outcome == "failure", LedgerEvent.occurred_at >= window_start)
+        .where(
+            LedgerEvent.outcome == "failure",
+            LedgerEvent.occurred_at >= window_start,
+            LedgerEvent.tenant_id == tenant_id,
+        )
         .group_by(LedgerEvent.actor_id)
         .having(func.count() >= FAILED_LOGIN_THRESHOLD)
     )
@@ -69,7 +77,7 @@ async def _failed_login_alerts(db: AsyncSession, now: datetime) -> list[AlertIns
 
     return [
         AlertInstance(
-            key=_make_key("failed_logins", row.actor_id, bucket),
+            key=_make_key("failed_logins", tenant_id, row.actor_id, bucket),
             rule_id="failed_logins",
             rule_name="Repeated failed logins",
             severity="high",
@@ -82,13 +90,17 @@ async def _failed_login_alerts(db: AsyncSession, now: datetime) -> list[AlertIns
     ]
 
 
-async def _bulk_export_alerts(db: AsyncSession, now: datetime) -> list[AlertInstance]:
+async def _bulk_export_alerts(db: AsyncSession, now: datetime, *, tenant_id: UUID) -> list[AlertInstance]:
     window_start = now - timedelta(minutes=BULK_EXPORT_WINDOW_MINUTES)
     bucket = _bucket_start(now, BULK_EXPORT_WINDOW_MINUTES)
 
     stmt = (
         select(LedgerEvent.actor_id, func.count().label("access_count"))
-        .where(LedgerEvent.event_category == "data_access", LedgerEvent.occurred_at >= window_start)
+        .where(
+            LedgerEvent.event_category == "data_access",
+            LedgerEvent.occurred_at >= window_start,
+            LedgerEvent.tenant_id == tenant_id,
+        )
         .group_by(LedgerEvent.actor_id)
         .having(func.count() >= BULK_EXPORT_THRESHOLD)
     )
@@ -96,7 +108,7 @@ async def _bulk_export_alerts(db: AsyncSession, now: datetime) -> list[AlertInst
 
     return [
         AlertInstance(
-            key=_make_key("bulk_data_export", row.actor_id, bucket),
+            key=_make_key("bulk_data_export", tenant_id, row.actor_id, bucket),
             rule_id="bulk_data_export",
             rule_name="Bulk data export detected",
             severity="critical",
@@ -109,13 +121,14 @@ async def _bulk_export_alerts(db: AsyncSession, now: datetime) -> list[AlertInst
     ]
 
 
-async def _critical_financial_alerts(db: AsyncSession, now: datetime) -> list[AlertInstance]:
+async def _critical_financial_alerts(db: AsyncSession, now: datetime, *, tenant_id: UUID) -> list[AlertInstance]:
     lookback = now - timedelta(hours=CRITICAL_FINANCIAL_LOOKBACK_HOURS)
 
     stmt = select(LedgerEvent).where(
         LedgerEvent.event_category == "financial_transaction",
         LedgerEvent.severity.in_(["high", "critical"]),
         LedgerEvent.occurred_at >= lookback,
+        LedgerEvent.tenant_id == tenant_id,
     )
     rows = (await db.execute(stmt)).scalars().all()
 
@@ -134,12 +147,12 @@ async def _critical_financial_alerts(db: AsyncSession, now: datetime) -> list[Al
     ]
 
 
-async def evaluate_alerts(db: AsyncSession) -> list[AlertInstance]:
+async def evaluate_alerts(db: AsyncSession, *, tenant_id: UUID) -> list[AlertInstance]:
     now = datetime.now(timezone.utc)
     alerts = (
-        await _failed_login_alerts(db, now)
-        + await _bulk_export_alerts(db, now)
-        + await _critical_financial_alerts(db, now)
+        await _failed_login_alerts(db, now, tenant_id=tenant_id)
+        + await _bulk_export_alerts(db, now, tenant_id=tenant_id)
+        + await _critical_financial_alerts(db, now, tenant_id=tenant_id)
     )
 
     if not alerts:
@@ -147,7 +160,11 @@ async def evaluate_alerts(db: AsyncSession) -> list[AlertInstance]:
 
     keys = [a.key for a in alerts]
     acks = (
-        await db.execute(select(AlertAcknowledgment).where(AlertAcknowledgment.alert_key.in_(keys)))
+        await db.execute(
+            select(AlertAcknowledgment).where(
+                AlertAcknowledgment.alert_key.in_(keys), AlertAcknowledgment.tenant_id == tenant_id
+            )
+        )
     ).scalars().all()
     acks_by_key = {a.alert_key: a for a in acks}
 
@@ -162,9 +179,15 @@ async def evaluate_alerts(db: AsyncSession) -> list[AlertInstance]:
     return alerts
 
 
-async def acknowledge_alert(db: AsyncSession, *, alert_key: str, rule_id: str, actor_id: str, status: str, user_id) -> None:
+async def acknowledge_alert(
+    db: AsyncSession, *, alert_key: str, rule_id: str, actor_id: str, status: str, user_id, tenant_id: UUID
+) -> None:
     existing = (
-        await db.execute(select(AlertAcknowledgment).where(AlertAcknowledgment.alert_key == alert_key))
+        await db.execute(
+            select(AlertAcknowledgment).where(
+                AlertAcknowledgment.alert_key == alert_key, AlertAcknowledgment.tenant_id == tenant_id
+            )
+        )
     ).scalar_one_or_none()
 
     now = datetime.now(timezone.utc)
@@ -175,6 +198,7 @@ async def acknowledge_alert(db: AsyncSession, *, alert_key: str, rule_id: str, a
     else:
         db.add(
             AlertAcknowledgment(
+                tenant_id=tenant_id,
                 alert_key=alert_key,
                 rule_id=rule_id,
                 actor_id=actor_id,

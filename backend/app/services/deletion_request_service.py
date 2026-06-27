@@ -19,9 +19,10 @@ class RoleAlreadyVotedError(Exception):
 
 
 async def create_request(
-    db: AsyncSession, *, requested_by: User, target_type: str, target_id: UUID, reason: str
+    db: AsyncSession, *, requested_by: User, target_type: str, target_id: UUID, reason: str, tenant_id: UUID
 ) -> DeletionRequest:
     request = DeletionRequest(
+        tenant_id=tenant_id,
         requested_by=requested_by.id,
         target_type=target_type,
         target_id=target_id,
@@ -35,14 +36,24 @@ async def create_request(
     return request
 
 
-async def list_requests(db: AsyncSession) -> list[DeletionRequest]:
+async def list_requests(db: AsyncSession, *, tenant_id: UUID) -> list[DeletionRequest]:
     return list(
-        (await db.execute(select(DeletionRequest).order_by(DeletionRequest.created_at.desc()))).scalars().all()
+        (
+            await db.execute(
+                select(DeletionRequest)
+                .where(DeletionRequest.tenant_id == tenant_id)
+                .order_by(DeletionRequest.created_at.desc())
+            )
+        ).scalars().all()
     )
 
 
-async def get_request(db: AsyncSession, request_id: UUID) -> DeletionRequest | None:
-    return (await db.execute(select(DeletionRequest).where(DeletionRequest.id == request_id))).scalar_one_or_none()
+async def get_request(db: AsyncSession, request_id: UUID, *, tenant_id: UUID) -> DeletionRequest | None:
+    return (
+        await db.execute(
+            select(DeletionRequest).where(DeletionRequest.id == request_id, DeletionRequest.tenant_id == tenant_id)
+        )
+    ).scalar_one_or_none()
 
 
 async def get_approvals(db: AsyncSession, request_id: UUID) -> list[DeletionApproval]:
@@ -106,6 +117,6 @@ async def decide(
 
 async def _execute(db: AsyncSession, request: DeletionRequest) -> None:
     if request.target_type == "user":
-        await deactivate_user(db, request.target_id)
+        await deactivate_user(db, request.target_id, tenant_id=request.tenant_id)
     elif request.target_type == "ingestion_source":
-        await deactivate_source(db, request.target_id)
+        await deactivate_source(db, request.target_id, tenant_id=request.tenant_id)

@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_source, get_db, require_role
+from app.api.deps import get_current_source, get_db, require_role, require_tenant_id
 from app.ledger.append import append_batch, append_event
 from app.models.ingestion_source import IngestionSource
 from app.models.ledger_event import LedgerEvent
@@ -41,7 +41,7 @@ async def submit_event(
     source: IngestionSource = Depends(get_current_source),
     db: AsyncSession = Depends(get_db),
 ) -> EventAck:
-    row = await append_event(db, event, source_id=source.id)
+    row = await append_event(db, event, source_id=source.id, tenant_id=source.tenant_id)
     await db.commit()
     return _to_ack(row)
 
@@ -53,7 +53,7 @@ async def submit_event_batch(
     db: AsyncSession = Depends(get_db),
 ) -> EventBatchAck:
     try:
-        rows = await append_batch(db, batch.events, source_id=source.id)
+        rows = await append_batch(db, batch.events, source_id=source.id, tenant_id=source.tenant_id)
     except Exception:
         await db.rollback()
         raise
@@ -67,7 +67,7 @@ def _json_default(value):
     return str(value)
 
 
-@router.get("/events/export", dependencies=[Depends(require_role("admin", "investigator"))])
+@router.get("/events/export", dependencies=[Depends(require_role("admin", "investigator", "platform_admin"))])
 async def export_events(
     actor_id: str | None = None,
     event_type: str | None = None,
@@ -78,6 +78,7 @@ async def export_events(
     format: Literal["csv", "json"] = "csv",
     limit: int = Query(default=500, ge=1, le=2000),
     db: AsyncSession = Depends(get_db),
+    tenant_id: UUID = Depends(require_tenant_id),
 ) -> StreamingResponse:
     """Evidence export, for the forensics suite's NPA-submission-prep flow.
     No new dependency: CSV via stdlib csv, JSON via json.dumps -- the same
@@ -87,8 +88,8 @@ async def export_events(
     param would otherwise greedily match the literal segment "export" first,
     since Starlette matches routes in registration order."""
     stmt = build_event_search_stmt(
-        actor_id=actor_id, event_type=event_type, event_category=event_category, outcome=outcome,
-        source_id=source_id, q=q,
+        tenant_id=tenant_id, actor_id=actor_id, event_type=event_type, event_category=event_category,
+        outcome=outcome, source_id=source_id, q=q,
     ).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     records = [EventRead.model_validate(r).model_dump() for r in rows]
@@ -118,14 +119,22 @@ async def export_events(
 @router.get(
     "/events/{event_id}",
     response_model=EventRead,
-    dependencies=[Depends(require_role("admin", "investigator"))],
+    dependencies=[Depends(require_role("admin", "investigator", "platform_admin"))],
 )
 async def get_event(
     event_id: UUID,
     db: AsyncSession = Depends(get_db),
+    tenant_id: UUID = Depends(require_tenant_id),
 ) -> EventRead:
-    row = (await db.execute(select(LedgerEvent).where(LedgerEvent.id == event_id))).scalar_one_or_none()
+    row = (
+        await db.execute(
+            select(LedgerEvent).where(LedgerEvent.id == event_id, LedgerEvent.tenant_id == tenant_id)
+        )
+    ).scalar_one_or_none()
     if row is None:
+        # Same 404 whether the event doesn't exist or belongs to another
+        # tenant -- never confirm a cross-tenant ID is valid via a different
+        # error code.
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Event not found")
     return EventRead.model_validate(row)
 
@@ -133,7 +142,7 @@ async def get_event(
 @router.get(
     "/events",
     response_model=list[EventRead],
-    dependencies=[Depends(require_role("admin", "investigator"))],
+    dependencies=[Depends(require_role("admin", "investigator", "platform_admin"))],
 )
 async def search_events(
     actor_id: str | None = None,
@@ -145,10 +154,11 @@ async def search_events(
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
+    tenant_id: UUID = Depends(require_tenant_id),
 ) -> list[EventRead]:
     stmt = build_event_search_stmt(
-        actor_id=actor_id, event_type=event_type, event_category=event_category, outcome=outcome,
-        source_id=source_id, q=q,
+        tenant_id=tenant_id, actor_id=actor_id, event_type=event_type, event_category=event_category,
+        outcome=outcome, source_id=source_id, q=q,
     ).limit(limit).offset(offset)
     rows = (await db.execute(stmt)).scalars().all()
     return [EventRead.model_validate(r) for r in rows]

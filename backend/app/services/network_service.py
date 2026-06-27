@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,7 +8,7 @@ from app.models.ledger_event import LedgerEvent
 MAX_EDGES = 75
 
 
-async def get_actor_target_network(db: AsyncSession) -> dict:
+async def get_actor_target_network(db: AsyncSession, *, tenant_id: UUID) -> dict:
     """Actor -> target edge counts, capped to the top N by frequency. Rendered
     client-side as a hand-rolled SVG node-link diagram -- no graph library
     needed for a dataset this small."""
@@ -17,7 +19,7 @@ async def get_actor_target_network(db: AsyncSession) -> dict:
             LedgerEvent.target_id,
             func.count().label("weight"),
         )
-        .where(LedgerEvent.target_id.is_not(None))
+        .where(LedgerEvent.target_id.is_not(None), LedgerEvent.tenant_id == tenant_id)
         .group_by(LedgerEvent.actor_id, LedgerEvent.target_type, LedgerEvent.target_id)
         .order_by(func.count().desc())
         .limit(MAX_EDGES)

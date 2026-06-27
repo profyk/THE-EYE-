@@ -18,6 +18,7 @@ class DeletionRequest(Base):
     __table_args__ = {"schema": "app"}
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("app.tenants.id"))
     requested_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("app.users.id"))
     target_type: Mapped[str] = mapped_column(String(32))
     target_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))

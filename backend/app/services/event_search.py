@@ -10,6 +10,7 @@ from app.models.ledger_event import LedgerEvent
 
 def build_event_search_stmt(
     *,
+    tenant_id: UUID | None,
     actor_id: str | None = None,
     event_type: str | None = None,
     event_category: str | None = None,
@@ -29,6 +30,11 @@ def build_event_search_stmt(
 
     stmt = select(LedgerEvent).order_by(LedgerEvent.sequence_num.desc())
 
+    # tenant_id=None is only valid for a platform_admin caller viewing across
+    # all tenants -- every other caller always passes their own tenant_id, so
+    # this is the one filter that's never optional for a real business user.
+    if tenant_id is not None:
+        stmt = stmt.where(LedgerEvent.tenant_id == tenant_id)
     if actor_id:
         stmt = stmt.where(LedgerEvent.actor_id == actor_id)
     if event_type:
@@ -56,6 +62,8 @@ def build_event_search_stmt(
     return stmt
 
 
-async def search_events_raw(db: AsyncSession, *, limit: int = 500, offset: int = 0, **filters) -> list[LedgerEvent]:
-    stmt = build_event_search_stmt(**filters).limit(limit).offset(offset)
+async def search_events_raw(
+    db: AsyncSession, *, tenant_id: UUID | None, limit: int = 500, offset: int = 0, **filters
+) -> list[LedgerEvent]:
+    stmt = build_event_search_stmt(tenant_id=tenant_id, **filters).limit(limit).offset(offset)
     return list((await db.execute(stmt)).scalars().all())

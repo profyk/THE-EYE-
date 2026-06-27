@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,11 +10,12 @@ from app.config import settings
 from app.core.rate_limit import check_rate_limit
 from app.core.request_utils import get_client_ip
 from app.ledger.append import append_event
+from app.models.ledger_event import DEFAULT_TENANT_ID
 from app.schemas.event import EventCreate
 from app.schemas.user import LoginRequest, LoginResponse
 from app.services.geoip_service import lookup_geoip
 from app.services.source_service import get_source_by_name
-from app.services.user_service import authenticate_user, create_session, delete_session_by_token
+from app.services.user_service import authenticate_user, create_session, delete_session_by_token, get_user_by_username
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
 
@@ -28,7 +30,9 @@ USERNAME_RATE_LIMIT_MAX_REQUESTS = 8
 USERNAME_RATE_LIMIT_WINDOW_SECONDS = 900
 
 
-async def _log_dashboard_login(db: AsyncSession, *, username: str, outcome: str, client_ip: str | None) -> None:
+async def _log_dashboard_login(
+    db: AsyncSession, *, username: str, outcome: str, client_ip: str | None, tenant_id: UUID
+) -> None:
     """Every dashboard login attempt -- success or failure -- becomes a real
     ledger event. This is the literal data backing the access-log dashboard:
     no separate logging system, just the same immutable audit trail
@@ -52,7 +56,7 @@ async def _log_dashboard_login(db: AsyncSession, *, username: str, outcome: str,
         origin_ip=client_ip,
         metadata={"geo": geo} if geo else {},
     )
-    await append_event(db, event, source_id=source.id)
+    await append_event(db, event, source_id=source.id, tenant_id=tenant_id)
     await db.commit()
 
 
@@ -73,8 +77,24 @@ async def login(
 
     user = await authenticate_user(db, body.username, body.password)
 
+    # Attribute the attempt to a real tenant whenever possible, even on a
+    # failed attempt -- a wrong-password attempt against a real username
+    # still tells that business owner something about their own org. An
+    # unknown username has no tenant to attribute it to (honest limitation:
+    # there's no way to know who an attacker was *trying* to be), so it falls
+    # back to the bootstrap tenant rather than inventing an attribution.
+    if user is not None:
+        login_tenant_id = user.tenant_id or DEFAULT_TENANT_ID
+    else:
+        existing = await get_user_by_username(db, body.username)
+        login_tenant_id = (existing.tenant_id if existing else None) or DEFAULT_TENANT_ID
+
     await _log_dashboard_login(
-        db, username=body.username, outcome="success" if user else "failure", client_ip=client_ip
+        db,
+        username=body.username,
+        outcome="success" if user else "failure",
+        client_ip=client_ip,
+        tenant_id=login_tenant_id,
     )
 
     if user is None:
