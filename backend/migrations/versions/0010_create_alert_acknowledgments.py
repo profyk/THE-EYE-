@@ -28,9 +28,25 @@ def upgrade() -> None:
         sa.CheckConstraint("status IN ('acknowledged','escalated')", name="ck_alert_ack_status"),
         schema="app",
     )
-    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON app.alert_acknowledgments TO eye_app")
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'eye_app') THEN
+                GRANT SELECT, INSERT, UPDATE, DELETE ON app.alert_acknowledgments TO eye_app;
+            END IF;
+        END $$;
+        """
+    )
 
 
 def downgrade() -> None:
-    op.execute("REVOKE SELECT, INSERT, UPDATE, DELETE ON app.alert_acknowledgments FROM eye_app")
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'eye_app') THEN
+                REVOKE SELECT, INSERT, UPDATE, DELETE ON app.alert_acknowledgments FROM eye_app;
+            END IF;
+        END $$;
+        """
+    )
     op.drop_table("alert_acknowledgments", schema="app")

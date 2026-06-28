@@ -15,12 +15,17 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Grants: eye_app (the FastAPI runtime role) gets INSERT/SELECT on ledger.events
-    # only -- never UPDATE or DELETE. chain_head needs a narrow UPDATE for the
-    # serialized-append flow in app/ledger/append.py.
-    op.execute("GRANT INSERT, SELECT ON ledger.events TO eye_app")
-    op.execute("GRANT SELECT ON ledger.chain_head TO eye_app")
-    op.execute("GRANT UPDATE (last_sequence_num, last_hash) ON ledger.chain_head TO eye_app")
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'eye_app') THEN
+                GRANT INSERT, SELECT ON ledger.events TO eye_app;
+                GRANT SELECT ON ledger.chain_head TO eye_app;
+                GRANT UPDATE (last_sequence_num, last_hash) ON ledger.chain_head TO eye_app;
+            END IF;
+        END $$;
+        """
+    )
 
     # Belt-and-suspenders trigger: even if grants regress or a future role is
     # accidentally given broader privileges, this makes the append-only intent

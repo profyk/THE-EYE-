@@ -32,7 +32,15 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
         schema="app",
     )
-    op.execute("GRANT SELECT, INSERT, UPDATE ON app.tenants TO eye_app")
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'eye_app') THEN
+                GRANT SELECT, INSERT, UPDATE ON app.tenants TO eye_app;
+            END IF;
+        END $$;
+        """
+    )
 
     op.execute(
         f"""
@@ -100,5 +108,13 @@ def downgrade() -> None:
     op.drop_constraint("fk_users_tenant_id", "users", schema="app", type_="foreignkey")
     op.drop_column("users", "tenant_id", schema="app")
 
-    op.execute("REVOKE SELECT, INSERT, UPDATE ON app.tenants FROM eye_app")
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'eye_app') THEN
+                REVOKE SELECT, INSERT, UPDATE ON app.tenants FROM eye_app;
+            END IF;
+        END $$;
+        """
+    )
     op.drop_table("tenants", schema="app")

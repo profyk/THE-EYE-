@@ -33,9 +33,25 @@ def upgrade() -> None:
         ),
         schema="app",
     )
-    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON app.users TO eye_app")
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'eye_app') THEN
+                GRANT SELECT, INSERT, UPDATE, DELETE ON app.users TO eye_app;
+            END IF;
+        END $$;
+        """
+    )
 
 
 def downgrade() -> None:
-    op.execute("REVOKE SELECT, INSERT, UPDATE, DELETE ON app.users FROM eye_app")
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'eye_app') THEN
+                REVOKE SELECT, INSERT, UPDATE, DELETE ON app.users FROM eye_app;
+            END IF;
+        END $$;
+        """
+    )
     op.drop_table("users", schema="app")

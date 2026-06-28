@@ -37,7 +37,15 @@ def upgrade() -> None:
     )
     op.create_index("ix_ingestion_sources_tenant", "ingestion_sources", ["tenant_id"], schema="app")
 
-    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON app.ingestion_sources TO eye_app")
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'eye_app') THEN
+                GRANT SELECT, INSERT, UPDATE, DELETE ON app.ingestion_sources TO eye_app;
+            END IF;
+        END $$;
+        """
+    )
 
 
 def downgrade() -> None:

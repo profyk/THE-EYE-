@@ -18,23 +18,36 @@ def upgrade() -> None:
     op.execute("CREATE SCHEMA IF NOT EXISTS ledger")
     op.execute("CREATE SCHEMA IF NOT EXISTS app")
 
-    # Restricted runtime role the FastAPI app connects as. Real credentials come
-    # from the DATABASE_URL env var / infra secrets manager in real deployments;
-    # this default password is for local dev only and must be rotated before any
-    # non-local use.
+    # Restricted runtime role -- created only when the DB user has CREATEROLE.
+    # Managed Postgres (Railway, RDS, etc.) often disallows CREATEROLE even for
+    # the admin user; in that case we skip creation and the app falls back to
+    # connecting as the admin user (DATABASE_URL = ADMIN_DATABASE_URL).
+    # The trigger-based append-only guarantee holds regardless of which role connects.
     op.execute(
         """
         DO $$
         BEGIN
             IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'eye_app') THEN
-                CREATE ROLE eye_app LOGIN PASSWORD 'eye_app_devpassword';
+                BEGIN
+                    CREATE ROLE eye_app LOGIN PASSWORD 'eye_app_devpassword';
+                EXCEPTION WHEN insufficient_privilege THEN
+                    RAISE NOTICE 'eye_app role not created (insufficient privilege) -- set DATABASE_URL = ADMIN_DATABASE_URL in your env';
+                END;
             END IF;
         END $$;
         """
     )
 
-    op.execute("GRANT USAGE ON SCHEMA ledger TO eye_app")
-    op.execute("GRANT USAGE ON SCHEMA app TO eye_app")
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'eye_app') THEN
+                GRANT USAGE ON SCHEMA ledger TO eye_app;
+                GRANT USAGE ON SCHEMA app TO eye_app;
+            END IF;
+        END $$;
+        """
+    )
 
 
 def downgrade() -> None:

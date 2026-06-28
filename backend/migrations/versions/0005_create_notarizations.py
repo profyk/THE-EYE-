@@ -28,10 +28,25 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
         schema="ledger",
     )
-    # Phase 1 only ever inserts here (manual/scripted local snapshots); no UPDATE/DELETE needed.
-    op.execute("GRANT INSERT, SELECT ON ledger.notarizations TO eye_app")
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'eye_app') THEN
+                GRANT INSERT, SELECT ON ledger.notarizations TO eye_app;
+            END IF;
+        END $$;
+        """
+    )
 
 
 def downgrade() -> None:
-    op.execute("REVOKE INSERT, SELECT ON ledger.notarizations FROM eye_app")
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'eye_app') THEN
+                REVOKE INSERT, SELECT ON ledger.notarizations FROM eye_app;
+            END IF;
+        END $$;
+        """
+    )
     op.drop_table("notarizations", schema="ledger")

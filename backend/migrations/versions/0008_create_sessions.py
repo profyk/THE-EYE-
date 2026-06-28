@@ -28,10 +28,26 @@ def upgrade() -> None:
         schema="app",
     )
     op.create_index("ix_sessions_user_id", "sessions", ["user_id"], schema="app")
-    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON app.sessions TO eye_app")
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'eye_app') THEN
+                GRANT SELECT, INSERT, UPDATE, DELETE ON app.sessions TO eye_app;
+            END IF;
+        END $$;
+        """
+    )
 
 
 def downgrade() -> None:
-    op.execute("REVOKE SELECT, INSERT, UPDATE, DELETE ON app.sessions FROM eye_app")
+    op.execute(
+        """
+        DO $$ BEGIN
+            IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'eye_app') THEN
+                REVOKE SELECT, INSERT, UPDATE, DELETE ON app.sessions FROM eye_app;
+            END IF;
+        END $$;
+        """
+    )
     op.drop_index("ix_sessions_user_id", table_name="sessions", schema="app")
     op.drop_table("sessions", schema="app")
