@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { clearSession, getSession } from "@/lib/auth";
 import { listAlerts, logout } from "@/lib/api-client";
 import ChainIntegrityBadge from "@/components/ChainIntegrityBadge";
 import ThemeToggle from "@/components/ThemeToggle";
-import EyeLogo from "@/components/EyeLogo";
 
 const APPROVER_ROLES = ["chief_auditor", "compliance_officer", "security_officer", "executive_authority"];
 const REPORT_READER_ROLES = ["admin", "investigator"];
@@ -64,7 +64,9 @@ export default function NavBar() {
     <header className="no-print bg-deep border-b border-border">
       <div className="px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <Link href="/overview" className="flex items-center gap-3">
-          <EyeLogo size={36} />
+          <div className="bg-white rounded-lg p-0.5 shrink-0">
+            <Image src="/logo.png" alt="THE EYE" width={38} height={38} className="rounded-md" priority />
+          </div>
           <div>
             <p className="font-mono font-extrabold text-[17px] tracking-[3px] text-accent leading-none">THE EYE</p>
             <p className="text-[9px] tracking-[2px] text-muted uppercase">Intelligence &amp; Accountability Platform</p>

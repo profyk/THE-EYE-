@@ -1,12 +1,12 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { login as loginRequest } from "@/lib/api-client";
 import { isLoggedIn, setSession } from "@/lib/auth";
 import Panel from "@/components/Panel";
 import Button from "@/components/Button";
-import EyeLogo from "@/components/EyeLogo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -44,9 +44,10 @@ export default function LoginPage() {
       <Panel className="w-full max-w-sm p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex flex-col items-center text-center gap-2 mb-2">
-            <EyeLogo size={44} />
-            <p className="font-mono font-extrabold text-lg tracking-[3px] text-accent">THE EYE</p>
-            <p className="text-[9px] tracking-[2px] text-muted uppercase -mt-1">Intelligence &amp; Accountability Platform</p>
+            <div className="bg-white rounded-2xl p-2 shadow-sm">
+              <Image src="/logo.png" alt="THE EYE" width={110} height={110} priority />
+            </div>
+            <p className="text-[9px] tracking-[2px] text-muted uppercase">Intelligence &amp; Accountability Platform</p>
             <p className="text-sm text-muted mt-1">Sign in with your account.</p>
           </div>
           <input
