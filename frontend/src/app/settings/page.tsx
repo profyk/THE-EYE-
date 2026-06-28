@@ -4,9 +4,23 @@ import { useEffect, useState } from "react";
 import NavBar from "@/components/NavBar";
 import Panel from "@/components/Panel";
 import StatusBadge from "@/components/StatusBadge";
+import Button from "@/components/Button";
 import { useRequireAuth } from "@/lib/useRequireAuth";
 import { getSession } from "@/lib/auth";
-import { getPlatformInfo, getChainSummary, getOverviewStats, ApiError, PlatformInfo, ChainSummary, OverviewStats } from "@/lib/api-client";
+import {
+  getPlatformInfo, getChainSummary, getOverviewStats,
+  listUsers, createUser, deactivateUser,
+  ApiError, PlatformInfo, ChainSummary, OverviewStats, UserRead,
+} from "@/lib/api-client";
+
+const ROLES = [
+  "admin",
+  "investigator",
+  "chief_auditor",
+  "compliance_officer",
+  "security_officer",
+  "executive_authority",
+];
 
 function Row({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
@@ -14,6 +28,131 @@ function Row({ label, value, mono }: { label: string; value: React.ReactNode; mo
       <span className="text-sm text-muted">{label}</span>
       <span className={`text-sm font-semibold ${mono ? "font-mono" : ""}`}>{value}</span>
     </div>
+  );
+}
+
+function UserManagementPanel() {
+  const [users, setUsers] = useState<UserRead[]>([]);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("admin");
+  const [formErr, setFormErr] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deactivating, setDeactivating] = useState<string | null>(null);
+
+  const load = () =>
+    listUsers()
+      .then(setUsers)
+      .catch((e: ApiError) => setLoadErr(e.message || "Failed to load users"));
+
+  useEffect(() => { load(); }, []);
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setFormErr(null);
+    setSaving(true);
+    try {
+      await createUser(username, password, role);
+      setUsername(""); setPassword(""); setRole("admin");
+      setShowForm(false);
+      await load();
+    } catch (e: unknown) {
+      setFormErr(e instanceof ApiError ? e.message : "Failed to create user");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeactivate(id: string) {
+    setDeactivating(id);
+    try {
+      await deactivateUser(id);
+      await load();
+    } finally {
+      setDeactivating(null);
+    }
+  }
+
+  return (
+    <Panel className="px-5">
+      <div className="flex items-center justify-between pt-4 pb-2">
+        <p className="text-xs font-bold tracking-wide text-muted uppercase">Users</p>
+        {!showForm && (
+          <Button variant="outline" tone="accent" className="text-xs py-1 px-3" onClick={() => setShowForm(true)}>
+            + New User
+          </Button>
+        )}
+      </div>
+
+      {loadErr && <p className="text-sm text-danger pb-3">{loadErr}</p>}
+
+      {showForm && (
+        <form onSubmit={handleCreate} className="mb-4 space-y-3 border border-border rounded-lg p-4">
+          <p className="text-sm font-semibold">Create User</p>
+          {formErr && <p className="text-xs text-danger">{formErr}</p>}
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              required
+              placeholder="Username"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              className="col-span-2 bg-surface border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+            />
+            <input
+              required
+              type="password"
+              placeholder="Password (12+ chars)"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="col-span-2 bg-surface border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+            />
+            <select
+              value={role}
+              onChange={e => setRole(e.target.value)}
+              className="col-span-2 bg-surface border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+            >
+              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit" disabled={saving}>{saving ? "Creating…" : "Create"}</Button>
+            <Button type="button" variant="ghost" tone="muted" onClick={() => { setShowForm(false); setFormErr(null); }}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+
+      <div className="divide-y divide-border pb-2">
+        {users.length === 0 && !loadErr && (
+          <p className="text-sm text-muted py-3">No users yet.</p>
+        )}
+        {users.map(u => (
+          <div key={u.id} className="flex items-center justify-between py-3">
+            <div className="flex items-center gap-3">
+              <div>
+                <p className="text-sm font-semibold">{u.username}</p>
+                <p className="text-xs text-muted">{u.role}</p>
+              </div>
+              {!u.is_active && <StatusBadge tone="muted">Inactive</StatusBadge>}
+            </div>
+            {u.is_active && (
+              <Button
+                variant="ghost"
+                tone="danger"
+                className="text-xs py-1 px-2"
+                disabled={deactivating === u.id}
+                onClick={() => handleDeactivate(u.id)}
+              >
+                {deactivating === u.id ? "…" : "Deactivate"}
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+    </Panel>
   );
 }
 
@@ -130,6 +269,8 @@ export default function SettingsPage() {
             </div>
           )}
         </Panel>
+
+        <UserManagementPanel />
 
         <Panel className="px-5">
           <p className="text-xs font-bold tracking-wide text-muted uppercase pt-4 pb-2">Immutability guarantees</p>
