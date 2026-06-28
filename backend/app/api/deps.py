@@ -11,6 +11,7 @@ from app.models.ingestion_source import IngestionSource
 from app.models.user import User
 from app.services.intrusion_service import log_failed_ingestion_attempt
 from app.services.source_service import get_source_by_key_hash, touch_last_seen
+from app.services.tenant_service import get_tenant_by_id
 from app.services.user_service import get_user_by_session_token
 
 __all__ = [
@@ -83,6 +84,17 @@ async def get_current_user(
     user = await get_user_by_session_token(db, raw_token)
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired session")
+
+    # Block tenant-scoped users whose subscription has lapsed.
+    # platform_admin has no tenant and is never blocked here.
+    if user.tenant_id is not None:
+        tenant = await get_tenant_by_id(db, user.tenant_id)
+        if tenant is not None and not tenant.is_active:
+            raise HTTPException(
+                status.HTTP_402_PAYMENT_REQUIRED,
+                "Subscription inactive — please renew your plan to continue.",
+            )
+
     return user
 
 

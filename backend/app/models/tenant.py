@@ -6,10 +6,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 
-# Minimal Phase 1 fields -- this is the multi-tenancy foundation, not billing.
-# Subscription/plan fields belong to a later migration once self-serve
-# signup + payments exist, so they don't need to disrupt this one.
-
 
 class Tenant(Base):
     __tablename__ = "tenants"
@@ -20,3 +16,6 @@ class Tenant(Base):
     slug: Mapped[str] = mapped_column(String(64), unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped["DateTime"] = mapped_column(DateTime(timezone=True))
+    paddle_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    paddle_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    paddle_subscription_status: Mapped[str | None] = mapped_column(String(64), nullable=True)

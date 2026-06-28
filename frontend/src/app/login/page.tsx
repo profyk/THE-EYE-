@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { login as loginRequest } from "@/lib/api-client";
 import { isLoggedIn, setSession } from "@/lib/auth";
@@ -71,6 +72,10 @@ export default function LoginPage() {
           <Button type="submit" disabled={loading || !username || !password} className="w-full">
             {loading ? "Signing in..." : "Sign in"}
           </Button>
+          <p className="text-center text-xs text-muted">
+            Don&apos;t have an account?{" "}
+            <Link href="/signup" className="text-accent hover:underline">Sign up</Link>
+          </p>
         </form>
       </Panel>
     </div>

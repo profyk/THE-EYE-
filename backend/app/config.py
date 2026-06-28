@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-6"
 
+    # Paddle Billing -- required for self-serve signup and subscription gating.
+    # paddle_webhook_secret: from Paddle dashboard → Notifications → webhook secret.
+    # paddle_price_id: the subscription price ID (pri_xxx) clients are charged on.
+    # paddle_environment: "sandbox" for testing, "production" for live.
+    paddle_webhook_secret: str = ""
+    paddle_price_id: str = ""
+    paddle_environment: str = "sandbox"
+
     # Security hardening knobs. Sane production defaults; override in .env.
     # Minimum password length enforced on create and reset -- 12 is NIST SP
     # 800-63B's recommended floor for subscriber-chosen memorized secrets.

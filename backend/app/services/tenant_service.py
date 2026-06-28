@@ -8,8 +8,8 @@ from app.models.tenant import Tenant
 from app.schemas.tenant import TenantCreate
 
 
-async def create_tenant(db: AsyncSession, data: TenantCreate) -> Tenant:
-    tenant = Tenant(name=data.name, slug=data.slug, created_at=datetime.now(timezone.utc))
+async def create_tenant(db: AsyncSession, data: TenantCreate, *, is_active: bool = True) -> Tenant:
+    tenant = Tenant(name=data.name, slug=data.slug, is_active=is_active, created_at=datetime.now(timezone.utc))
     db.add(tenant)
     await db.commit()
     await db.refresh(tenant)

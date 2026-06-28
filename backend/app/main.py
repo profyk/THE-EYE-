@@ -13,10 +13,12 @@ from app.api.v1 import (
     intrusion,
     investigate,
     platform,
+    signup,
     sources,
     stats,
     tenants,
     users,
+    webhooks,
     whistleblower,
 )
 from app.config import settings
@@ -110,6 +112,8 @@ app.add_exception_handler(Exception, _generic_500_handler)
 app.include_router(events.router)
 app.include_router(sources.router)
 app.include_router(auth.router)
+app.include_router(signup.router)
+app.include_router(webhooks.router)
 app.include_router(users.router)
 app.include_router(stats.router)
 app.include_router(alerts.router)
