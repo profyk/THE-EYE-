@@ -25,9 +25,7 @@ target_metadata = Base.metadata
 # that point each test at a fresh disposable database -- by setting
 # ADMIN_DATABASE_URL and re-invoking `alembic upgrade` within the same process --
 # aren't stuck with whatever URL was current the first time app.config was imported.
-config.set_main_option(
-    "sqlalchemy.url", os.environ.get("ADMIN_DATABASE_URL", settings.admin_database_url)
-)
+config.set_main_option("sqlalchemy.url", settings.alembic_url)
 
 
 def run_migrations_offline() -> None:

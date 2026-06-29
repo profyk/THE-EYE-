@@ -6,6 +6,24 @@ class Settings(BaseSettings):
 
     database_url: str
     admin_database_url: str = ""
+
+    @property
+    def asyncpg_url(self) -> str:
+        """Normalise Railway's postgres:// / postgresql:// to postgresql+asyncpg://."""
+        url = self.database_url
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+asyncpg://" + url[len(prefix):]
+        return url
+
+    @property
+    def alembic_url(self) -> str:
+        """URL for Alembic migrations: prefers ADMIN_DATABASE_URL, falls back to DATABASE_URL."""
+        raw = self.admin_database_url or self.database_url
+        for prefix in ("postgres://", "postgresql://"):
+            if raw.startswith(prefix):
+                return "postgresql+asyncpg://" + raw[len(prefix):]
+        return raw
     env: str = "development"
     cors_allowed_origins: str = "http://localhost:3000"
 
