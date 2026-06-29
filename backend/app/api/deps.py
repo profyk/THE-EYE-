@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import Depends, Header, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.rate_limit import check_rate_limit
 from app.core.request_utils import get_client_ip
 from app.core.security import hash_api_key
@@ -86,8 +87,9 @@ async def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired session")
 
     # Block tenant-scoped users whose subscription has lapsed.
-    # platform_admin has no tenant and is never blocked here.
-    if user.tenant_id is not None:
+    # Only enforced when Paddle is configured -- skipped until billing is
+    # wired up so existing accounts are never locked out before first webhook.
+    if user.tenant_id is not None and settings.paddle_webhook_secret:
         tenant = await get_tenant_by_id(db, user.tenant_id)
         if tenant is not None and not tenant.is_active:
             raise HTTPException(
