@@ -40,15 +40,11 @@ async def main() -> None:
     if not all([tenant_name, tenant_slug, admin_username, admin_password]):
         return
 
-    if len(admin_password) < 12:
-        print("BOOTSTRAP ERROR: BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters.", flush=True)
-        sys.exit(1)
-
     from app.core.security import validate_password_strength
     err = validate_password_strength(admin_password, 12)
     if err:
-        print(f"BOOTSTRAP ERROR: {err}", flush=True)
-        sys.exit(1)
+        print(f"Bootstrap WARNING: bad password — {err} (skipping, fix BOOTSTRAP_ADMIN_PASSWORD)", flush=True)
+        return
 
     async with SessionLocal() as db:
         # --- Force reset path: update existing admin password ---
@@ -81,4 +77,7 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except Exception as exc:
+        print(f"Bootstrap ERROR (server will still start): {exc}", flush=True)
