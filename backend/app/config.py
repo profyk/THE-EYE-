@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     paddle_price_id: str = ""
     paddle_environment: str = "sandbox"
 
+    # Emergency recovery -- set a random string here, use it once to reset a
+    # password via POST /v1/recovery/reset-password, then delete it immediately.
+    recovery_token: str = ""
+
     # Security hardening knobs. Sane production defaults; override in .env.
     # Minimum password length enforced on create and reset -- 12 is NIST SP
     # 800-63B's recommended floor for subscriber-chosen memorized secrets.

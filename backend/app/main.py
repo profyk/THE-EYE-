@@ -13,6 +13,7 @@ from app.api.v1 import (
     intrusion,
     investigate,
     platform,
+    recovery,
     signup,
     sources,
     stats,
@@ -114,6 +115,7 @@ app.include_router(sources.router)
 app.include_router(auth.router)
 app.include_router(signup.router)
 app.include_router(webhooks.router)
+app.include_router(recovery.router)
 app.include_router(users.router)
 app.include_router(stats.router)
 app.include_router(alerts.router)

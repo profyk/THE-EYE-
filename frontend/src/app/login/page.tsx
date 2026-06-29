@@ -32,8 +32,12 @@ export default function LoginPage() {
     } catch (err: unknown) {
       if (err instanceof ApiError && err.status === 402) {
         setError("Your subscription is inactive. Please renew your plan to continue.");
-      } else {
+      } else if (err instanceof ApiError && err.status === 401) {
         setError("Invalid username or password.");
+      } else if (err instanceof ApiError) {
+        setError(`Server error (${err.status}) — check Railway logs.`);
+      } else {
+        setError("Could not reach the server — check your internet connection.");
       }
     } finally {
       setLoading(false);
