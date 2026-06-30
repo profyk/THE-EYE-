@@ -37,6 +37,9 @@ const ICONS: Record<string, React.ReactElement> = {
   billing:   <Icon d="M1 4h22v16a2 2 0 01-2 2H3a2 2 0 01-2-2V4zM1 10h22" />,
   machines:  <Icon d="M2 3h20v14H2zM8 21h8M12 17v4" />,
   intrusion: <Icon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+  fileact:   <Icon d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M8 13h8M8 17h5" />,
+  usbevents: <Icon d="M12 22V8M5 12H2l10-10 10 10h-3M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />,
+  audittrail:<Icon d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16zM8 11h6M11 8v6" />,
   sources:   <Icon d="M5 12H3m4.22-4.22L5.8 6.35M12 5V3m4.22 2.78l1.42-1.42M19 12h2m-4.22 4.22l1.42 1.42M12 19v2m-4.22-2.78l-1.42 1.42M6 12a6 6 0 1112 0 6 6 0 01-12 0z" />,
   manageusers:<Icon d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" d2="M12 11a4 4 0 100-8 4 4 0 000 8zM20 8v6M23 11h-6" />,
   deletion:  <Icon d="M3 6h18M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6m5 0V4a1 1 0 011-1h2a1 1 0 011 1v2" />,
@@ -50,6 +53,7 @@ const MONITOR_ITEMS = [
   { href: "/timeline",            label: "Timeline",        icon: ICONS.timeline     },
   { href: "/analytics",           label: "Analytics",       icon: ICONS.analytics    },
   { href: "/activity",            label: "Activity",        icon: ICONS.activity     },
+  { href: "/file-activity",       label: "File Activity",   icon: ICONS.fileact      },
 ];
 
 const SECURITY_ITEMS = [
@@ -57,6 +61,7 @@ const SECURITY_ITEMS = [
   { href: "/alert-rules",         label: "Alert Rules",     icon: ICONS.alertrules   },
   { href: "/intrusion-detection", label: "Intrusion",       icon: ICONS.intrusion    },
   { href: "/users-risk",          label: "Users & Risk",    icon: ICONS.users        },
+  { href: "/file-activity?tab=usb", label: "USB & Devices", icon: ICONS.usbevents   },
 ];
 
 const AUDIT_ITEMS = [
@@ -64,6 +69,7 @@ const AUDIT_ITEMS = [
   { href: "/chain",               label: "Chain",           icon: ICONS.chain        },
   { href: "/investigate",         label: "Investigate",     icon: ICONS.investigate  },
   { href: "/access-log",          label: "Access Log",      icon: ICONS.accesslog    },
+  { href: "/audit-trail",         label: "Audit Trail",     icon: ICONS.audittrail   },
 ];
 
 const APPROVER_ROLES = ["admin", "chief_auditor", "compliance_officer", "security_officer", "executive_authority"];

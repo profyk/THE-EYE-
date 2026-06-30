@@ -1,5 +1,6 @@
 import { EventRead, EventSearchParams } from "@/types/event";
 import { clearSession, Session } from "@/lib/auth";
+export type { EventRead };
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -524,4 +525,79 @@ export interface AgentMachine {
 
 export async function listMachines(): Promise<AgentMachine[]> {
   return request<AgentMachine[]>("/v1/agent/machines-portal");
+}
+
+// ── File Activity ─────────────────────────────────────────────────────────────
+
+export async function getFileActivity(params: {
+  actor_id?: string;
+  host?: string;
+  operation?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<EventRead[]> {
+  const q = new URLSearchParams();
+  if (params.actor_id) q.set("actor_id", params.actor_id);
+  if (params.host)     q.set("host",     params.host);
+  if (params.operation) q.set("operation", params.operation);
+  if (params.limit)    q.set("limit",    String(params.limit));
+  if (params.offset)   q.set("offset",   String(params.offset));
+  return request<EventRead[]>(`/v1/file-activity?${q}`);
+}
+
+export async function getUsbEvents(params: {
+  host?: string;
+  actor_id?: string;
+  limit?: number;
+}): Promise<EventRead[]> {
+  const q = new URLSearchParams();
+  if (params.host)     q.set("host",     params.host);
+  if (params.actor_id) q.set("actor_id", params.actor_id);
+  if (params.limit)    q.set("limit",    String(params.limit));
+  return request<EventRead[]>(`/v1/usb-events?${q}`);
+}
+
+export async function getAuditTrail(params: {
+  subject: string;
+  machine?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}): Promise<EventRead[]> {
+  const q = new URLSearchParams({ subject: params.subject });
+  if (params.machine) q.set("machine", params.machine);
+  if (params.from)    q.set("from",    params.from);
+  if (params.to)      q.set("to",      params.to);
+  if (params.limit)   q.set("limit",   String(params.limit));
+  return request<EventRead[]>(`/v1/audit-trail?${q}`);
+}
+
+// ── Event Flagging ────────────────────────────────────────────────────────────
+
+export interface EventFlag {
+  id: string;
+  event_id: string;
+  flag_type: string;
+  note: string | null;
+  flagged_by_name: string | null;
+  created_at: string;
+}
+
+export async function flagEvent(
+  eventId: string,
+  flag_type: string,
+  note?: string,
+): Promise<EventFlag> {
+  return request<EventFlag>(`/v1/events/${eventId}/flags`, {
+    method: "POST",
+    body: JSON.stringify({ flag_type, note: note ?? null }),
+  });
+}
+
+export async function getEventFlags(eventId: string): Promise<EventFlag[]> {
+  return request<EventFlag[]>(`/v1/events/${eventId}/flags`);
+}
+
+export async function deleteFlag(eventId: string, flagId: string): Promise<void> {
+  return request<void>(`/v1/events/${eventId}/flags/${flagId}`, { method: "DELETE" });
 }

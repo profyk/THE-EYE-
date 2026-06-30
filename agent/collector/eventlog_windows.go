@@ -43,9 +43,14 @@ type subscription struct {
 var subscriptions = []subscription{
 	{
 		channel: "Security",
+		// Auth · process · user/group · privilege · network · object access ·
+		// scheduled tasks · NTLM · USB device audit (6416 = new removable device)
 		query: "*[System[(EventID=4624 or EventID=4625 or EventID=4634 or" +
 			" EventID=4647 or EventID=4673 or EventID=4688 or EventID=4720 or" +
-			" EventID=4726 or EventID=4732 or EventID=4733 or EventID=5156)]]",
+			" EventID=4726 or EventID=4732 or EventID=4733 or EventID=4660 or" +
+			" EventID=4663 or EventID=4670 or EventID=4698 or EventID=4699 or" +
+			" EventID=4700 or EventID=4701 or EventID=4702 or EventID=4776 or" +
+			" EventID=5156 or EventID=6416)]]",
 	},
 	{
 		channel: "System",
@@ -70,12 +75,15 @@ func New(cfg *config.Config, q *queue.Queue) *Collector {
 	return &Collector{cfg: cfg, q: q, host: h}
 }
 
-// Run starts all subscriptions. Blocks until the process exits.
+// Run starts all subscriptions, the file-system watcher, and the USB monitor.
+// Blocks until the process exits.
 func (c *Collector) Run() {
 	for _, sub := range subscriptions {
 		go c.runSubscription(sub)
 	}
-	select {} // block forever; goroutines are daemon threads
+	go c.runFileWatcher()
+	go c.runUSBMonitor()
+	select {}
 }
 
 func (c *Collector) runSubscription(sub subscription) {
@@ -441,6 +449,143 @@ func (c *Collector) translate(ev *winEvent, _ string) *queue.Event {
 			Severity:      "info",
 			ActorType:     "system",
 			ActorID:       host,
+			Metadata:      meta,
+		}
+
+	// ── Object access / file deletion (requires object-access auditing) ─────
+	case 4660:
+		return &queue.Event{
+			OccurredAt:    ts,
+			EventType:     "file.deleted",
+			EventCategory: "file_activity",
+			Outcome:       "success",
+			Severity:      "high",
+			ActorType:     "user",
+			ActorID:       sanitize(d["SubjectUserName"]),
+			Metadata:      meta,
+		}
+
+	case 4663:
+		meta["object_name"] = d["ObjectName"]
+		meta["accesses"] = d["Accesses"]
+		return &queue.Event{
+			OccurredAt:    ts,
+			EventType:     "file.accessed",
+			EventCategory: "file_activity",
+			Outcome:       "success",
+			Severity:      "info",
+			ActorType:     "user",
+			ActorID:       sanitize(d["SubjectUserName"]),
+			Metadata:      meta,
+		}
+
+	case 4670:
+		meta["object_name"] = d["ObjectName"]
+		meta["old_sd"] = d["OldSd"]
+		meta["new_sd"] = d["NewSd"]
+		return &queue.Event{
+			OccurredAt:    ts,
+			EventType:     "file.permissions_changed",
+			EventCategory: "file_activity",
+			Outcome:       "success",
+			Severity:      "high",
+			ActorType:     "user",
+			ActorID:       sanitize(d["SubjectUserName"]),
+			Metadata:      meta,
+		}
+
+	// ── Scheduled task lifecycle (persistence mechanism) ──────────────────────
+	case 4698:
+		meta["task_name"] = d["TaskName"]
+		meta["task_content"] = truncate(d["TaskContent"], 500)
+		return &queue.Event{
+			OccurredAt:    ts,
+			EventType:     "task.created",
+			EventCategory: "persistence",
+			Outcome:       "success",
+			Severity:      "critical",
+			ActorType:     "user",
+			ActorID:       sanitize(d["SubjectUserName"]),
+			Metadata:      meta,
+		}
+
+	case 4699:
+		meta["task_name"] = d["TaskName"]
+		return &queue.Event{
+			OccurredAt:    ts,
+			EventType:     "task.deleted",
+			EventCategory: "persistence",
+			Outcome:       "success",
+			Severity:      "high",
+			ActorType:     "user",
+			ActorID:       sanitize(d["SubjectUserName"]),
+			Metadata:      meta,
+		}
+
+	case 4700, 4701:
+		op := "enabled"
+		if ev.System.EventID == 4701 {
+			op = "disabled"
+		}
+		meta["task_name"] = d["TaskName"]
+		return &queue.Event{
+			OccurredAt:    ts,
+			EventType:     "task." + op,
+			EventCategory: "persistence",
+			Outcome:       "success",
+			Severity:      "high",
+			ActorType:     "user",
+			ActorID:       sanitize(d["SubjectUserName"]),
+			Metadata:      meta,
+		}
+
+	case 4702:
+		meta["task_name"] = d["TaskName"]
+		return &queue.Event{
+			OccurredAt:    ts,
+			EventType:     "task.updated",
+			EventCategory: "persistence",
+			Outcome:       "success",
+			Severity:      "high",
+			ActorType:     "user",
+			ActorID:       sanitize(d["SubjectUserName"]),
+			Metadata:      meta,
+		}
+
+	// ── NTLM auth (credential stuffing indicator) ─────────────────────────────
+	case 4776:
+		outcome := "success"
+		sev := "info"
+		if d["ErrorCode"] != "0x0" && d["ErrorCode"] != "" {
+			outcome = "failure"
+			sev = "high"
+		}
+		return &queue.Event{
+			OccurredAt:    ts,
+			EventType:     "auth.ntlm",
+			EventCategory: "authentication",
+			Outcome:       outcome,
+			Severity:      sev,
+			ActorType:     "user",
+			ActorID:       sanitize(d["TargetUserName"]),
+			OriginIP:      sanitizeIP(d["Workstation"]),
+			Metadata:      meta,
+		}
+
+	// ── New external/removable device ─────────────────────────────────────────
+	case 6416:
+		meta["device_id"] = d["DeviceId"]
+		meta["device_description"] = d["DeviceDescription"]
+		meta["class_name"] = d["ClassName"]
+		meta["vendor_ids"] = d["VendorIds"]
+		return &queue.Event{
+			OccurredAt:    ts,
+			EventType:     "device.connected",
+			EventCategory: "removable_media",
+			Outcome:       "success",
+			Severity:      "high",
+			ActorType:     "user",
+			ActorID:       sanitize(d["SubjectUserName"]),
 			Metadata:      meta,
 		}
 
