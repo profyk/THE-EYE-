@@ -152,7 +152,7 @@ _SEVERITY_MAP = {"warn": "warning", "critical": "critical", "error": "high"}
 
 
 def _sanitise_event_type(raw: str) -> str:
-    """Force event_type into the ^[a-z0-9_]+\.[a-z0-9_]+$ pattern."""
+    """Force event_type into the ^[a-z0-9_]+.[a-z0-9_]+$ pattern."""
     lowered = raw.lower().strip()
     # Replace any non-allowed character with underscore.
     clean = re.sub(r"[^a-z0-9_.]", "_", lowered)
