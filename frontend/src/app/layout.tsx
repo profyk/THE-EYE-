@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "THE EYE",
   description: "Tamper-proof monitoring, auditing, and accountability platform",
+  icons: {
+    icon: "/app-icon.png",
+    apple: "/app-icon.png",
+    shortcut: "/app-icon.png",
+  },
 };
 
 // Runs before React hydrates, directly setting the class on <html> from
