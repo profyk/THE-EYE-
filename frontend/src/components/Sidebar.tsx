@@ -127,7 +127,7 @@ export default function Sidebar() {
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-4 py-4 border-b border-border shrink-0">
         <div className="bg-white rounded-lg p-0.5 shrink-0">
-          <Image src="/logo.png" alt="THE EYE" width={30} height={30} className="rounded-md" priority />
+          <Image src="/app-icon.png" alt="THE EYE" width={30} height={30} className="rounded-md" priority />
         </div>
         <div>
           <p className="font-mono font-extrabold text-[13px] tracking-[2.5px] text-accent leading-none">THE EYE</p>
