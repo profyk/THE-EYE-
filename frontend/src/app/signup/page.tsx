@@ -71,7 +71,7 @@ export default function SignupPage() {
         {done ? (
           <div className="flex flex-col items-center text-center gap-4 py-6">
             <div className="bg-white rounded-2xl p-2 shadow-sm">
-              <Image src="/logo.png" alt="THE EYE" width={80} height={80} priority />
+              <Image src="/app-icon.png" alt="THE EYE" width={80} height={80} priority />
             </div>
             <div className="w-12 h-12 rounded-full bg-[var(--safe)]/10 flex items-center justify-center">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--safe)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -85,7 +85,7 @@ export default function SignupPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex flex-col items-center text-center gap-2 mb-2">
               <div className="bg-white rounded-2xl p-2 shadow-sm">
-                <Image src="/logo.png" alt="THE EYE" width={80} height={80} priority />
+                <Image src="/app-icon.png" alt="THE EYE" width={80} height={80} priority />
               </div>
               <p className="text-[9px] tracking-[2px] text-[var(--muted)] uppercase">Intelligence &amp; Accountability Platform</p>
               <p className="text-sm text-[var(--muted)] mt-1">Create your organisation account.</p>

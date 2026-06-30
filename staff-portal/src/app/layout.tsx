@@ -4,6 +4,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "THE EYE — Command Centre",
   description: "Internal staff portal",
+  icons: {
+    icon: "/app-icon.png",
+    apple: "/app-icon.png",
+    shortcut: "/app-icon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
