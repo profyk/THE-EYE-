@@ -139,11 +139,13 @@ async def promote_super_admin(
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"User '{data.username}' not found.")
 
-    # Raw SQL UPDATE bypasses ORM tracking. tenant_id stays untouched so
-    # the existing constraint (tenant_id IS NOT NULL OR role = ...) still passes.
-    await db.execute(
-        text("UPDATE app.users SET role = 'super_admin' WHERE username = :u"),
-        {"u": data.username},
-    )
-    await db.commit()
+    try:
+        await db.execute(
+            text("UPDATE app.users SET role = 'super_admin' WHERE username = :u"),
+            {"u": data.username},
+        )
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        return {"ok": False, "error": str(exc)}
     return {"ok": True, "message": f"'{data.username}' is now super_admin. Remove RECOVERY_TOKEN now."}
