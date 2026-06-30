@@ -76,9 +76,11 @@ class Settings(BaseSettings):
     # paddle_webhook_secret: from Paddle dashboard → Notifications → webhook secret.
     # paddle_price_id: the subscription price ID (pri_xxx) clients are charged on.
     # paddle_environment: "sandbox" for testing, "production" for live.
+    paddle_api_key: str = ""
     paddle_webhook_secret: str = ""
     paddle_price_id: str = ""
     paddle_environment: str = "sandbox"
+    paddle_client_token: str = ""
 
     # Emergency recovery -- set a random string here, use it once to reset a
     # password via POST /v1/recovery/reset-password, then delete it immediately.

@@ -454,3 +454,55 @@ export async function updateApiKey(
 export async function revokeApiKey(id: string): Promise<void> {
   await request<void>(`/v1/api-keys/${id}`, { method: "DELETE" });
 }
+
+// ── Billing & Plans ───────────────────────────────────────────────────────────
+
+export interface Plan {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  price_monthly: number | null;
+  price_annual: number | null;
+  currency: string;
+  features: string[] | null;
+  limits: Record<string, number | null> | null;
+  is_public: boolean;
+  sort_order: number;
+  has_paddle: boolean;
+}
+
+export interface SubscriptionOut {
+  tenant_id: string;
+  tenant_name: string;
+  plan: Plan | null;
+  paddle_subscription_id: string | null;
+  paddle_subscription_status: string | null;
+  paddle_customer_id: string | null;
+}
+
+export interface CheckoutResponse {
+  checkout_url: string | null;
+  transaction_id: string | null;
+  contact_sales: boolean;
+  message: string;
+}
+
+export async function getPublicPlans(): Promise<Plan[]> {
+  return request<Plan[]>("/v1/billing/plans");
+}
+
+export async function getTenantSubscription(): Promise<SubscriptionOut> {
+  return request<SubscriptionOut>("/v1/billing/subscription");
+}
+
+export async function createCheckout(
+  plan_id: string,
+  billing_cycle: "monthly" | "annual",
+): Promise<CheckoutResponse> {
+  return request<CheckoutResponse>("/v1/billing/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plan_id, billing_cycle }),
+  });
+}

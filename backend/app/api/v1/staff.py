@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import cast, func, select
 from sqlalchemy import Date
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -259,3 +259,145 @@ async def get_platform_analytics(db: AsyncSession = Depends(get_db)) -> Platform
         events_by_category=events_by_category,
         top_tenants=top_tenants,
     )
+
+
+# ── Plan management ───────────────────────────────────────────────────────────
+
+class PlanCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    slug: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9-]+$")
+    description: str | None = None
+    price_monthly: float | None = None
+    price_annual: float | None = None
+    currency: str = "USD"
+    paddle_price_id_monthly: str | None = None
+    paddle_price_id_annual: str | None = None
+    features: list[str] | None = None
+    limits: dict | None = None
+    is_public: bool = True
+    sort_order: int = 0
+
+
+class PlanUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    description: str | None = None
+    price_monthly: float | None = None
+    price_annual: float | None = None
+    paddle_price_id_monthly: str | None = None
+    paddle_price_id_annual: str | None = None
+    features: list[str] | None = None
+    limits: dict | None = None
+    is_active: bool | None = None
+    is_public: bool | None = None
+    sort_order: int | None = None
+
+
+class StaffPlanOut(BaseModel):
+    id: UUID
+    name: str
+    slug: str
+    description: str | None
+    price_monthly: float | None
+    price_annual: float | None
+    currency: str
+    paddle_price_id_monthly: str | None
+    paddle_price_id_annual: str | None
+    features: list[str] | None
+    limits: dict | None
+    is_active: bool
+    is_public: bool
+    sort_order: int
+    tenant_count: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+def _staff_plan_out(p, tenant_count: int = 0) -> StaffPlanOut:
+    return StaffPlanOut(
+        id=p.id, name=p.name, slug=p.slug, description=p.description,
+        price_monthly=float(p.price_monthly) if p.price_monthly else None,
+        price_annual=float(p.price_annual) if p.price_annual else None,
+        currency=p.currency,
+        paddle_price_id_monthly=p.paddle_price_id_monthly,
+        paddle_price_id_annual=p.paddle_price_id_annual,
+        features=p.features, limits=p.limits,
+        is_active=p.is_active, is_public=p.is_public, sort_order=p.sort_order,
+        tenant_count=tenant_count,
+    )
+
+
+@router.get("/plans", response_model=list[StaffPlanOut])
+async def staff_list_plans(db: AsyncSession = Depends(get_db)) -> list[StaffPlanOut]:
+    from app.models.plan import Plan as PlanModel
+    plans = list((await db.execute(select(PlanModel).order_by(PlanModel.sort_order))).scalars().all())
+    counts_rows = list((await db.execute(
+        select(Tenant.plan_id, func.count().label("cnt"))
+        .where(Tenant.plan_id.isnot(None))
+        .group_by(Tenant.plan_id)
+    )).all())
+    counts = {str(r.plan_id): r.cnt for r in counts_rows}
+    return [_staff_plan_out(p, counts.get(str(p.id), 0)) for p in plans]
+
+
+@router.post("/plans", response_model=StaffPlanOut, status_code=status.HTTP_201_CREATED)
+async def staff_create_plan(data: PlanCreate, db: AsyncSession = Depends(get_db)) -> StaffPlanOut:
+    from app.models.plan import Plan as PlanModel
+    plan = PlanModel(
+        name=data.name, slug=data.slug, description=data.description,
+        price_monthly=data.price_monthly, price_annual=data.price_annual,
+        currency=data.currency,
+        paddle_price_id_monthly=data.paddle_price_id_monthly,
+        paddle_price_id_annual=data.paddle_price_id_annual,
+        features=data.features, limits=data.limits,
+        is_public=data.is_public, sort_order=data.sort_order,
+    )
+    db.add(plan)
+    await db.commit()
+    await db.refresh(plan)
+    return _staff_plan_out(plan)
+
+
+@router.patch("/plans/{plan_id}", response_model=StaffPlanOut)
+async def staff_update_plan(plan_id: UUID, data: PlanUpdate, db: AsyncSession = Depends(get_db)) -> StaffPlanOut:
+    from app.models.plan import Plan as PlanModel
+    from datetime import datetime as _dt, timezone as _tz
+    plan = (await db.execute(select(PlanModel).where(PlanModel.id == plan_id))).scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Plan not found.")
+    for field, val in data.model_dump(exclude_none=True).items():
+        setattr(plan, field, val)
+    plan.updated_at = _dt.now(_tz.utc)
+    await db.commit()
+    await db.refresh(plan)
+    return _staff_plan_out(plan)
+
+
+@router.delete("/plans/{plan_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def staff_archive_plan(plan_id: UUID, db: AsyncSession = Depends(get_db)) -> None:
+    from app.models.plan import Plan as PlanModel
+    plan = (await db.execute(select(PlanModel).where(PlanModel.id == plan_id))).scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Plan not found.")
+    plan.is_active = False
+    await db.commit()
+
+
+class AssignPlanRequest(BaseModel):
+    plan_id: UUID | None = None
+    paddle_subscription_status: str | None = None
+
+
+@router.post("/tenants/{tenant_id}/assign-plan", status_code=status.HTTP_200_OK)
+async def staff_assign_plan(
+    tenant_id: UUID,
+    data: AssignPlanRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Tenant not found.")
+    tenant.plan_id = data.plan_id
+    if data.paddle_subscription_status is not None:
+        tenant.paddle_subscription_status = data.paddle_subscription_status
+    await db.commit()
+    return {"ok": True, "tenant_id": str(tenant_id), "plan_id": str(data.plan_id) if data.plan_id else None}

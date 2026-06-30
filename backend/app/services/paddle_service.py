@@ -1,13 +1,65 @@
-"""Paddle Billing webhook verification and subscription event handling."""
+"""Paddle Billing webhook verification, checkout, and subscription event handling."""
 import hashlib
 import hmac
 from typing import Any
 from uuid import UUID
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.tenant import Tenant
+
+PADDLE_API_BASE = {
+    "production": "https://api.paddle.com",
+    "sandbox": "https://sandbox-api.paddle.com",
+}
+
+
+def _base_url() -> str:
+    return PADDLE_API_BASE.get(settings.paddle_environment, PADDLE_API_BASE["sandbox"])
+
+
+def _api_headers() -> dict:
+    return {
+        "Authorization": f"Bearer {settings.paddle_api_key}",
+        "Content-Type": "application/json",
+    }
+
+
+async def create_checkout_transaction(
+    price_id: str,
+    customer_email: str | None = None,
+    custom_data: dict | None = None,
+) -> dict:
+    """Create a Paddle transaction and return its data (includes checkout.url)."""
+    payload: dict = {"items": [{"price_id": price_id, "quantity": 1}]}
+    if customer_email:
+        payload["customer"] = {"email": customer_email}
+    if custom_data:
+        payload["custom_data"] = custom_data
+    async with httpx.AsyncClient() as client:
+        r = await client.post(
+            f"{_base_url()}/transactions",
+            headers=_api_headers(),
+            json=payload,
+            timeout=15,
+        )
+        r.raise_for_status()
+        return r.json()["data"]
+
+
+async def cancel_subscription(subscription_id: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        r = await client.post(
+            f"{_base_url()}/subscriptions/{subscription_id}/cancel",
+            headers=_api_headers(),
+            json={"effective_from": "next_billing_period"},
+            timeout=15,
+        )
+        r.raise_for_status()
+        return r.json()["data"]
 
 # Paddle events that mean the subscription is live/paying.
 _ACTIVE_EVENTS = {"subscription.activated", "subscription.resumed", "subscription.trialing"}

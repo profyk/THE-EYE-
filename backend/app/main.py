@@ -9,6 +9,7 @@ from app.api.v1 import (
     alerts,
     api_keys,
     auth,
+    billing,
     deletion_requests,
     events,
     forensics,
@@ -132,6 +133,7 @@ app.include_router(staff.router)
 app.include_router(platform.router)
 app.include_router(api_keys.router)
 app.include_router(agent.router)
+app.include_router(billing.router)
 
 
 @app.get("/healthz")

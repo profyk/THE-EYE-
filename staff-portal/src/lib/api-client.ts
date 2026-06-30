@@ -117,3 +117,73 @@ export interface PlatformAnalytics {
 export async function getPlatformAnalytics(): Promise<PlatformAnalytics> {
   return request<PlatformAnalytics>("/v1/staff/analytics");
 }
+
+// ── Plan management ───────────────────────────────────────────────────────────
+
+export interface StaffPlan {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  price_monthly: number | null;
+  price_annual: number | null;
+  currency: string;
+  paddle_price_id_monthly: string | null;
+  paddle_price_id_annual: string | null;
+  features: string[] | null;
+  limits: Record<string, number | null> | null;
+  is_active: boolean;
+  is_public: boolean;
+  sort_order: number;
+  tenant_count: number;
+}
+
+export interface PlanCreatePayload {
+  name: string;
+  slug: string;
+  description?: string;
+  price_monthly?: number;
+  price_annual?: number;
+  currency?: string;
+  paddle_price_id_monthly?: string;
+  paddle_price_id_annual?: string;
+  features?: string[];
+  limits?: Record<string, number | null>;
+  is_public?: boolean;
+  sort_order?: number;
+}
+
+export async function staffListPlans(): Promise<StaffPlan[]> {
+  return request<StaffPlan[]>("/v1/staff/plans");
+}
+
+export async function staffCreatePlan(data: PlanCreatePayload): Promise<StaffPlan> {
+  return request<StaffPlan>("/v1/staff/plans", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function staffUpdatePlan(
+  id: string,
+  data: Partial<PlanCreatePayload> & { is_active?: boolean },
+): Promise<StaffPlan> {
+  return request<StaffPlan>(`/v1/staff/plans/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function staffAssignPlan(
+  tenantId: string,
+  planId: string | null,
+  subscriptionStatus?: string,
+): Promise<void> {
+  await request<void>(`/v1/staff/tenants/${tenantId}/assign-plan`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plan_id: planId, paddle_subscription_status: subscriptionStatus }),
+  });
+}
