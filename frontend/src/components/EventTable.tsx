@@ -15,15 +15,16 @@ const OUTCOME_TONE: Record<string, StatusTone> = {
 interface Props {
   events: EventRead[];
   highlightIds?: Set<string>;
+  noBorder?: boolean;
 }
 
-export default function EventTable({ events, highlightIds }: Props) {
+export default function EventTable({ events, highlightIds, noBorder }: Props) {
   if (events.length === 0) {
     return <EmptyState>No events match the current filters.</EmptyState>;
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border">
+    <div className={noBorder ? "overflow-x-auto" : "overflow-x-auto rounded-xl border border-border"}>
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="text-left border-b border-border bg-surface">
