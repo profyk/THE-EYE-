@@ -139,31 +139,11 @@ async def promote_super_admin(
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"User '{data.username}' not found.")
 
-    # Fix constraint in-place using raw DDL (safe whether migration ran or not).
-    await db.execute(text("""
-        DO $$ BEGIN
-            IF EXISTS (
-                SELECT 1 FROM information_schema.table_constraints
-                WHERE constraint_schema = 'app' AND table_name = 'users'
-                  AND constraint_name = 'ck_users_tenant_required_unless_platform_admin'
-            ) THEN
-                ALTER TABLE app.users DROP CONSTRAINT ck_users_tenant_required_unless_platform_admin;
-            END IF;
-            IF EXISTS (
-                SELECT 1 FROM information_schema.table_constraints
-                WHERE constraint_schema = 'app' AND table_name = 'users'
-                  AND constraint_name = 'ck_users_tenant_required_unless_super_admin'
-            ) THEN
-                ALTER TABLE app.users DROP CONSTRAINT ck_users_tenant_required_unless_super_admin;
-            END IF;
-        END $$
-    """))
-    await db.execute(text(
-        "ALTER TABLE app.users ADD CONSTRAINT ck_users_tenant_required_unless_super_admin "
-        "CHECK (tenant_id IS NOT NULL OR role = 'super_admin')"
-    ))
+    # Just flip the role — tenant_id stays set so the existing constraint
+    # (tenant_id IS NOT NULL OR role = ...) keeps passing. The staff portal
+    # gates on role only; having a tenant_id on a super_admin is harmless.
     await db.execute(
-        update(User).where(User.username == data.username).values(role="super_admin", tenant_id=None)
+        update(User).where(User.username == data.username).values(role="super_admin")
     )
     await db.commit()
     return {"ok": True, "message": f"'{data.username}' is now super_admin. Remove RECOVERY_TOKEN now."}
