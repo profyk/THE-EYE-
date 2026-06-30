@@ -58,11 +58,10 @@ class Settings(BaseSettings):
 
     @property
     def cookie_samesite(self) -> str:
-        # Frontend (Vercel) and backend (Railway) live on different domains in
-        # production, so cross-site fetch requests must use SameSite=None.
-        # SameSite=None requires Secure=True, which cookie_secure already enforces.
-        # In development both run on localhost so Strict is fine.
-        return "none" if self.env != "development" else "strict"
+        # Always None: frontend (Vercel) and backend (Railway) are on different
+        # domains so cross-site fetch requires SameSite=None. On localhost,
+        # browsers treat it as a secure context so None works without Secure too.
+        return "none"
 
     # AI investigate feature (Phase 2E) -- optional. Empty means the feature
     # returns a clear "not configured" error rather than failing unexpectedly.
