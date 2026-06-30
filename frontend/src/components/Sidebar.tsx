@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -19,7 +20,7 @@ function Icon({ d, d2 }: { d: string; d2?: string }) {
   );
 }
 
-const ICONS: Record<string, JSX.Element> = {
+const ICONS: Record<string, React.ReactElement> = {
   overview:  <Icon d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" />,
   events:    <Icon d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
   timeline:  <Icon d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />,
@@ -65,7 +66,7 @@ const AUDIT_ITEMS = [
 const APPROVER_ROLES = ["admin", "chief_auditor", "compliance_officer", "security_officer", "executive_authority"];
 const REPORT_READER_ROLES = ["admin", "investigator"];
 
-function NavGroup({ label, items }: { label: string; items: { href: string; label: string; icon: JSX.Element }[] }) {
+function NavGroup({ label, items }: { label: string; items: { href: string; label: string; icon: React.ReactElement }[] }) {
   const pathname = usePathname();
   return (
     <div>
