@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { login as loginRequest, ApiError, API_BASE } from "@/lib/api-client";
 import { isLoggedIn, setSession } from "@/lib/auth";
 import Panel from "@/components/Panel";
@@ -11,6 +11,9 @@ import Button from "@/components/Button";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const justSignedUp = searchParams.get("signup") === "true";
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -33,7 +36,7 @@ export default function LoginPage() {
       if (err instanceof ApiError && err.status === 402) {
         setError("Your subscription is inactive. Please renew your plan to continue.");
       } else if (err instanceof ApiError && err.status === 401) {
-        setError("Invalid username or password.");
+        setError("Invalid email or password.");
       } else if (err instanceof ApiError) {
         setError(`Server error (${err.status}) — check Railway logs.`);
       } else {
@@ -59,12 +62,21 @@ export default function LoginPage() {
             <p className="text-sm text-muted mt-1">Sign in with your account.</p>
           </div>
 
+          {justSignedUp && (
+            <div className="flex items-center gap-2 bg-[var(--safe)]/10 border border-[var(--safe)]/20 rounded-lg px-3 py-2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--safe)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <p className="text-sm text-[var(--safe)]">Account created — sign in to continue.</p>
+            </div>
+          )}
+
           <input
-            type="text"
+            type="email"
             autoFocus
             className={inputClass}
-            placeholder="Username"
-            autoComplete="username"
+            placeholder="Email address"
+            autoComplete="email"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
           />

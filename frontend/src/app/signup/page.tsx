@@ -1,97 +1,62 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { signup as signupRequest, ApiError } from "@/lib/api-client";
 import { isLoggedIn } from "@/lib/auth";
 import Panel from "@/components/Panel";
 import Button from "@/components/Button";
 
-declare global {
-  interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    Paddle?: any;
-  }
-}
-
-const PADDLE_CLIENT_TOKEN = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN ?? "";
-const PADDLE_PRICE_ID = process.env.NEXT_PUBLIC_PADDLE_PRICE_ID ?? "";
-const PADDLE_ENV = process.env.NEXT_PUBLIC_PADDLE_ENVIRONMENT ?? "sandbox";
-
-type Step = "form" | "checkout" | "activating";
-
 export default function SignupPage() {
   const router = useRouter();
-  const [step, setStep] = useState<Step>("form");
-  const [tenantName, setTenantName] = useState("");
-  const [tenantSlug, setTenantSlug] = useState("");
-  const [username, setUsername] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [companySlug, setCompanySlug] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const paddleReady = useRef(false);
+  const [done, setDone] = useState(false);
 
   useEffect(() => {
     if (isLoggedIn()) router.replace("/overview");
   }, [router]);
 
-  // Auto-generate slug from org name
-  function handleNameChange(val: string) {
-    setTenantName(val);
-    setTenantSlug(val.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""));
-  }
-
-  function initPaddle() {
-    if (!window.Paddle || paddleReady.current) return;
-    window.Paddle.Environment.set(PADDLE_ENV);
-    window.Paddle.Initialize({ token: PADDLE_CLIENT_TOKEN });
-    paddleReady.current = true;
+  function handleCompanyNameChange(val: string) {
+    setCompanyName(val);
+    setCompanySlug(
+      val.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+    );
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setLoading(true);
-
     try {
-      const { tenant_id } = await signupRequest(tenantName, tenantSlug, username, password);
-      setStep("checkout");
-
-      // Give Paddle.js a tick to be ready
-      await new Promise((r) => setTimeout(r, 100));
-      initPaddle();
-
-      if (!window.Paddle) {
-        setError("Payment provider failed to load. Please refresh and try again.");
-        setStep("form");
-        return;
-      }
-
-      window.Paddle.Checkout.open({
-        items: [{ priceId: PADDLE_PRICE_ID, quantity: 1 }],
-        customData: { tenant_id },
-        settings: {
-          displayMode: "overlay",
-          theme: "dark",
-          locale: "en",
-        },
-        eventCallback(ev: { name: string }) {
-          if (ev.name === "checkout.completed") {
-            setStep("activating");
-            setTimeout(() => router.replace("/login?activated=true"), 3000);
-          }
-          if (ev.name === "checkout.closed" && step !== "activating") {
-            setStep("form");
-          }
-        },
-      });
+      await signupRequest(companyName, companySlug, adminEmail, password);
+      setDone(true);
+      setTimeout(() => router.replace("/login?signup=true"), 2500);
     } catch (err: unknown) {
-      setError(err instanceof ApiError ? JSON.parse(err.message)?.detail ?? err.message : "Something went wrong.");
-      setStep("form");
+      if (err instanceof ApiError) {
+        try {
+          const body = JSON.parse(err.message);
+          setError(body?.detail ?? err.message);
+        } catch {
+          setError(err.message);
+        }
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -101,121 +66,154 @@ export default function SignupPage() {
     "w-full border border-border bg-surface text-text rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40";
 
   return (
-    <>
-      <Script
-        src="https://cdn.paddle.com/paddle/v2/paddle.js"
-        strategy="afterInteractive"
-        onLoad={initPaddle}
-      />
-
-      <div className="flex flex-1 items-center justify-center bg-void py-10">
-        <Panel className="w-full max-w-sm p-6">
-          {step === "activating" ? (
-            <div className="flex flex-col items-center text-center gap-4 py-6">
+    <div className="flex flex-1 items-center justify-center bg-void py-10">
+      <Panel className="w-full max-w-md p-6">
+        {done ? (
+          <div className="flex flex-col items-center text-center gap-4 py-6">
+            <div className="bg-white rounded-2xl p-2 shadow-sm">
+              <Image src="/logo.png" alt="THE EYE" width={80} height={80} priority />
+            </div>
+            <div className="w-12 h-12 rounded-full bg-[var(--safe)]/10 flex items-center justify-center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--safe)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <p className="font-semibold text-[var(--safe)]">Account created!</p>
+            <p className="text-sm text-[var(--muted)]">Redirecting you to sign in…</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="flex flex-col items-center text-center gap-2 mb-2">
               <div className="bg-white rounded-2xl p-2 shadow-sm">
                 <Image src="/logo.png" alt="THE EYE" width={80} height={80} priority />
               </div>
-              <p className="font-semibold text-safe">Payment confirmed!</p>
-              <p className="text-sm text-muted">Your account is being activated. Redirecting to login…</p>
+              <p className="text-[9px] tracking-[2px] text-[var(--muted)] uppercase">Intelligence &amp; Accountability Platform</p>
+              <p className="text-sm text-[var(--muted)] mt-1">Create your organisation account.</p>
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="flex flex-col items-center text-center gap-2 mb-2">
-                <div className="bg-white rounded-2xl p-2 shadow-sm">
-                  <Image src="/logo.png" alt="THE EYE" width={80} height={80} priority />
-                </div>
-                <p className="text-[9px] tracking-[2px] text-muted uppercase">Intelligence &amp; Accountability Platform</p>
-                <p className="text-sm text-muted mt-1">Create your organisation account.</p>
+
+            {error && (
+              <div className="flex items-start gap-2 bg-[var(--danger)]/5 border border-[var(--danger)]/20 rounded-lg px-3 py-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <p className="text-sm text-[var(--danger)]">{error}</p>
               </div>
+            )}
 
-              {error && <p className="text-sm text-danger">{error}</p>}
+            {/* Company details */}
+            <div className="space-y-1 pt-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted)]">Company</p>
+            </div>
 
-              <div className="space-y-1">
-                <label className="text-xs text-muted">Organisation name</label>
+            <div className="space-y-1">
+              <label className="text-xs text-[var(--muted)]">Company name</label>
+              <input
+                required
+                className={inputClass}
+                placeholder="Acme Corp"
+                value={companyName}
+                onChange={(e) => handleCompanyNameChange(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-[var(--muted)]">
+                Company ID <span className="text-[var(--muted)]/60">(auto-generated, lowercase)</span>
+              </label>
+              <input
+                required
+                className={inputClass}
+                placeholder="acme-corp"
+                value={companySlug}
+                pattern="^[a-z0-9-]+$"
+                title="Lowercase letters, numbers, and hyphens only"
+                onChange={(e) => setCompanySlug(e.target.value)}
+              />
+            </div>
+
+            {/* Admin account */}
+            <div className="space-y-1 pt-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted)]">Admin account</p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-[var(--muted)]">Work email</label>
+              <input
+                required
+                type="email"
+                className={inputClass}
+                placeholder="you@company.com"
+                autoComplete="email"
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+              />
+              <p className="text-[10px] text-[var(--muted)]/70">This will be your login username.</p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-[var(--muted)]">
+                Password <span className="text-[var(--muted)]/60">(12+ chars, 1 uppercase, 1 number)</span>
+              </label>
+              <div className="relative">
                 <input
                   required
-                  className={inputClass}
-                  placeholder="Acme Corp"
-                  value={tenantName}
-                  onChange={(e) => handleNameChange(e.target.value)}
+                  type={showPassword ? "text" : "password"}
+                  className={`${inputClass} pr-10`}
+                  placeholder="••••••••••••"
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                 />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--text)] transition-colors"
+                >
+                  {showPassword ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                      <line x1="1" y1="1" x2="23" y2="23"/>
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  )}
+                </button>
               </div>
+            </div>
 
-              <div className="space-y-1">
-                <label className="text-xs text-muted">Organisation slug <span className="text-muted/60">(URL-safe, auto-generated)</span></label>
-                <input
-                  required
-                  className={inputClass}
-                  placeholder="acme-corp"
-                  value={tenantSlug}
-                  pattern="^[a-z0-9-]+$"
-                  title="Lowercase letters, numbers, and hyphens only"
-                  onChange={(e) => setTenantSlug(e.target.value)}
-                />
-              </div>
+            <div className="space-y-1">
+              <label className="text-xs text-[var(--muted)]">Confirm password</label>
+              <input
+                required
+                type={showPassword ? "text" : "password"}
+                className={inputClass}
+                placeholder="••••••••••••"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
 
-              <div className="space-y-1">
-                <label className="text-xs text-muted">Admin username</label>
-                <input
-                  required
-                  className={inputClass}
-                  placeholder="admin"
-                  autoComplete="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-              </div>
+            <Button
+              type="submit"
+              className="w-full mt-2"
+              disabled={loading || !companyName || !companySlug || !adminEmail || !password || !confirmPassword}
+            >
+              {loading ? "Creating account…" : "Create account"}
+            </Button>
 
-              <div className="space-y-1">
-                <label className="text-xs text-muted">Password <span className="text-muted/60">(12+ chars, 1 uppercase, 1 number)</span></label>
-                <div className="relative">
-                  <input
-                    required
-                    type={showPassword ? "text" : "password"}
-                    className={`${inputClass} pr-10`}
-                    placeholder="••••••••••••"
-                    autoComplete="new-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    tabIndex={-1}
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-foreground transition-colors"
-                  >
-                    {showPassword ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                        <line x1="1" y1="1" x2="23" y2="23"/>
-                      </svg>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={loading || !tenantName || !tenantSlug || !username || !password}
-              >
-                {loading ? "Setting up…" : step === "checkout" ? "Opening payment…" : "Continue to payment →"}
-              </Button>
-
-              <p className="text-center text-xs text-muted">
-                Already have an account?{" "}
-                <Link href="/login" className="text-accent hover:underline">Sign in</Link>
-              </p>
-            </form>
-          )}
-        </Panel>
-      </div>
-    </>
+            <p className="text-center text-xs text-[var(--muted)]">
+              Already have an account?{" "}
+              <Link href="/login" className="text-[var(--accent)] hover:underline">Sign in</Link>
+            </p>
+          </form>
+        )}
+      </Panel>
+    </div>
   );
 }

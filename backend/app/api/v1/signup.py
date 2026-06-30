@@ -1,9 +1,8 @@
 """Public self-serve signup endpoint.
 
-Creates a pending (is_active=False) tenant and its first admin user.
-The tenant stays inactive until Paddle fires subscription.activated,
-at which point the webhook handler flips is_active=True and the user
-can log in.
+Creates an active tenant and its first admin user immediately — no payment
+gate. Billing/plan assignment happens post-signup through the normal
+subscription flow.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -26,14 +25,15 @@ SIGNUP_RATE_LIMIT_WINDOW = 3600  # 5 signups per IP per hour
 
 
 class SignupRequest(BaseModel):
-    tenant_name: str = Field(min_length=1, max_length=255)
-    tenant_slug: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9-]+$")
-    username: str = Field(min_length=1, max_length=64)
+    company_name: str = Field(min_length=1, max_length=255)
+    company_slug: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9-]+$")
+    admin_email: str = Field(min_length=3, max_length=254, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     password: str = Field(min_length=12, max_length=256)
 
 
 class SignupResponse(BaseModel):
     tenant_id: str
+    message: str
 
 
 @router.post("/signup", response_model=SignupResponse, status_code=status.HTTP_201_CREATED)
@@ -54,19 +54,22 @@ async def signup(
     if err:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, err)
 
-    if await get_tenant_by_slug(db, data.tenant_slug) is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Organisation slug is already taken.")
+    if await get_tenant_by_slug(db, data.company_slug) is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Company slug is already taken.")
 
-    if await get_user_by_username(db, data.username) is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Username is already taken.")
+    # Email is used as the login username — check uniqueness.
+    if await get_user_by_username(db, data.admin_email) is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "An account with that email already exists.")
 
-    # Create tenant in pending state — Paddle webhook activates it after payment.
     tenant = await create_tenant(
-        db, TenantCreate(name=data.tenant_name, slug=data.tenant_slug), is_active=False
+        db, TenantCreate(name=data.company_name, slug=data.company_slug), is_active=True
     )
     await create_user(
         db,
-        UserCreate(username=data.username, password=data.password, role="admin", tenant_id=tenant.id),
+        UserCreate(username=data.admin_email, password=data.password, role="admin", tenant_id=tenant.id),
     )
 
-    return SignupResponse(tenant_id=str(tenant.id))
+    return SignupResponse(
+        tenant_id=str(tenant.id),
+        message="Account created. You can now sign in.",
+    )

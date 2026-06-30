@@ -33,14 +33,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export async function signup(
-  tenantName: string,
-  tenantSlug: string,
-  username: string,
+  companyName: string,
+  companySlug: string,
+  adminEmail: string,
   password: string,
-): Promise<{ tenant_id: string }> {
-  return request<{ tenant_id: string }>("/v1/auth/signup", {
+): Promise<{ tenant_id: string; message: string }> {
+  return request<{ tenant_id: string; message: string }>("/v1/auth/signup", {
     method: "POST",
-    body: JSON.stringify({ tenant_name: tenantName, tenant_slug: tenantSlug, username, password }),
+    body: JSON.stringify({ company_name: companyName, company_slug: companySlug, admin_email: adminEmail, password }),
   });
 }
 
