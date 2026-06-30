@@ -10,6 +10,7 @@ const SESSION_KEY = "the_eye_session";
 export interface Session {
   username: string;
   role: string;
+  tenant_id: string | null;
 }
 
 export function getSession(): Session | null {

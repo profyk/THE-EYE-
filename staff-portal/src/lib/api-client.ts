@@ -92,3 +92,28 @@ export interface UserWithTenant {
 export async function listAllUsers(): Promise<UserWithTenant[]> {
   return request<UserWithTenant[]>("/v1/staff/users");
 }
+
+export interface BillingOverview {
+  total_tenants: number;
+  paying: number;
+  trialing: number;
+  past_due: number;
+  cancelled: number;
+  other: number;
+  status_breakdown: { status: string; count: number }[];
+}
+
+export async function getBillingOverview(): Promise<BillingOverview> {
+  return request<BillingOverview>("/v1/staff/billing");
+}
+
+export interface PlatformAnalytics {
+  events_by_day: { date: string; count: number }[];
+  events_by_severity: { severity: string; count: number }[];
+  events_by_category: { category: string; count: number }[];
+  top_tenants: { tenant_id: string; tenant_name: string; count: number }[];
+}
+
+export async function getPlatformAnalytics(): Promise<PlatformAnalytics> {
+  return request<PlatformAnalytics>("/v1/staff/analytics");
+}

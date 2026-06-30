@@ -412,3 +412,45 @@ export interface PlatformInfo {
 export async function getPlatformInfo(): Promise<PlatformInfo> {
   return request<PlatformInfo>("/v1/platform/info");
 }
+
+// ── API Keys ──────────────────────────────────────────────────────────────────
+
+export interface ApiKeyOut {
+  id: string;
+  name: string;
+  key_prefix: string;
+  is_active: boolean;
+  last_used_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+  created_by_username: string | null;
+}
+
+export interface ApiKeyCreated extends ApiKeyOut {
+  full_key: string;
+}
+
+export async function listApiKeys(): Promise<ApiKeyOut[]> {
+  return request<ApiKeyOut[]>("/v1/api-keys");
+}
+
+export async function createApiKey(name: string, expires_at?: string): Promise<ApiKeyCreated> {
+  return request<ApiKeyCreated>("/v1/api-keys", {
+    method: "POST",
+    body: JSON.stringify({ name, ...(expires_at ? { expires_at } : {}) }),
+  });
+}
+
+export async function updateApiKey(
+  id: string,
+  patch: { name?: string; is_active?: boolean },
+): Promise<ApiKeyOut> {
+  return request<ApiKeyOut>(`/v1/api-keys/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function revokeApiKey(id: string): Promise<void> {
+  await request<void>(`/v1/api-keys/${id}`, { method: "DELETE" });
+}

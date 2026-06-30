@@ -48,3 +48,4 @@ class LoginRequest(BaseModel):
 class LoginResponse(BaseModel):
     username: str
     role: Role
+    tenant_id: UUID | None = None

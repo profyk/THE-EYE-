@@ -5,7 +5,9 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1 import (
+    agent,
     alerts,
+    api_keys,
     auth,
     deletion_requests,
     events,
@@ -48,7 +50,7 @@ app.add_middleware(
     allow_origins=settings.cors_allowed_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", "X-Tenant-ID", "X-Api-Key"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(MaxBodySizeMiddleware, max_body_size=settings.max_request_body_bytes)
@@ -128,6 +130,8 @@ app.include_router(intrusion.router)
 app.include_router(tenants.router)
 app.include_router(staff.router)
 app.include_router(platform.router)
+app.include_router(api_keys.router)
+app.include_router(agent.router)
 
 
 @app.get("/healthz")

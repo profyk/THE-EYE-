@@ -3,7 +3,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import cast, func, select
+from sqlalchemy import Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, require_role
@@ -167,3 +168,94 @@ async def list_all_users(db: AsyncSession = Depends(get_db)) -> list[UserWithTen
         )
         for u in users
     ]
+
+
+# ── Billing overview ──────────────────────────────────────────────────────────
+
+class BillingOverview(BaseModel):
+    total_tenants: int
+    paying: int
+    trialing: int
+    past_due: int
+    cancelled: int
+    other: int
+    status_breakdown: list[dict]
+
+
+@router.get("/billing", response_model=BillingOverview)
+async def get_billing_overview(db: AsyncSession = Depends(get_db)) -> BillingOverview:
+    tenants = list((await db.execute(select(Tenant))).scalars().all())
+    breakdown: dict[str, int] = {}
+    for t in tenants:
+        s = t.paddle_subscription_status or "trial"
+        breakdown[s] = breakdown.get(s, 0) + 1
+    return BillingOverview(
+        total_tenants=len(tenants),
+        paying=breakdown.get("active", 0),
+        trialing=breakdown.get("trial", 0),
+        past_due=breakdown.get("past_due", 0),
+        cancelled=breakdown.get("canceled", 0) + breakdown.get("cancelled", 0),
+        other=sum(v for k, v in breakdown.items() if k not in ("active", "trial", "past_due", "canceled", "cancelled")),
+        status_breakdown=[{"status": k, "count": v} for k, v in sorted(breakdown.items(), key=lambda x: -x[1])],
+    )
+
+
+# ── Platform analytics ────────────────────────────────────────────────────────
+
+class PlatformAnalytics(BaseModel):
+    events_by_day: list[dict]
+    events_by_severity: list[dict]
+    events_by_category: list[dict]
+    top_tenants: list[dict]
+
+
+@router.get("/analytics", response_model=PlatformAnalytics)
+async def get_platform_analytics(db: AsyncSession = Depends(get_db)) -> PlatformAnalytics:
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+
+    day_rows = list((await db.execute(
+        select(cast(LedgerEvent.occurred_at, Date).label("day"), func.count().label("cnt"))
+        .where(LedgerEvent.occurred_at >= cutoff)
+        .group_by(cast(LedgerEvent.occurred_at, Date))
+        .order_by(cast(LedgerEvent.occurred_at, Date))
+    )).all())
+    events_by_day = [{"date": str(r.day), "count": r.cnt} for r in day_rows]
+
+    sev_rows = list((await db.execute(
+        select(LedgerEvent.severity, func.count().label("cnt"))
+        .group_by(LedgerEvent.severity)
+        .order_by(func.count().desc())
+    )).all())
+    events_by_severity = [{"severity": r.severity, "count": r.cnt} for r in sev_rows]
+
+    cat_rows = list((await db.execute(
+        select(LedgerEvent.event_category, func.count().label("cnt"))
+        .group_by(LedgerEvent.event_category)
+        .order_by(func.count().desc())
+        .limit(10)
+    )).all())
+    events_by_category = [{"category": r.event_category, "count": r.cnt} for r in cat_rows]
+
+    top_rows = list((await db.execute(
+        select(LedgerEvent.tenant_id, func.count().label("cnt"))
+        .where(LedgerEvent.occurred_at >= cutoff)
+        .group_by(LedgerEvent.tenant_id)
+        .order_by(func.count().desc())
+        .limit(10)
+    )).all())
+    tenant_ids = [r.tenant_id for r in top_rows]
+    tenants_map: dict = {}
+    if tenant_ids:
+        rows = list((await db.execute(select(Tenant).where(Tenant.id.in_(tenant_ids)))).scalars().all())
+        tenants_map = {t.id: t.name for t in rows}
+    top_tenants = [
+        {"tenant_id": str(r.tenant_id), "tenant_name": tenants_map.get(r.tenant_id, "Unknown"), "count": r.cnt}
+        for r in top_rows
+    ]
+
+    return PlatformAnalytics(
+        events_by_day=events_by_day,
+        events_by_severity=events_by_severity,
+        events_by_category=events_by_category,
+        top_tenants=top_tenants,
+    )

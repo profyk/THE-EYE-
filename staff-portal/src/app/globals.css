@@ -1,6 +1,25 @@
 @import "tailwindcss";
 
+/* Class-based dark/light mode */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
+  /* Light mode defaults */
+  --void: #f4f6fb;
+  --deep: #ffffff;
+  --surface: #eef1f6;
+  --panel: #ffffff;
+  --border: #e2e8f0;
+  --accent: #d97706;
+  --accent-dim: #b45309;
+  --danger: #dc2626;
+  --warn: #ea580c;
+  --safe: #16a34a;
+  --text: #0f172a;
+  --muted: #64748b;
+}
+
+.dark {
   --void: #04070b;
   --deep: #070d14;
   --surface: #0c1420;

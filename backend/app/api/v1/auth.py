@@ -110,7 +110,7 @@ async def login(
         max_age=settings.session_token_ttl_hours * 3600,
         path="/",
     )
-    return LoginResponse(username=user.username, role=user.role)
+    return LoginResponse(username=user.username, role=user.role, tenant_id=user.tenant_id)
 
 
 @router.get("/me", response_model=LoginResponse)
@@ -121,7 +121,7 @@ async def me(request: Request, db: AsyncSession = Depends(get_db)) -> LoginRespo
     user = await get_user_by_session_token(db, raw_token)
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired session")
-    return LoginResponse(username=user.username, role=user.role)
+    return LoginResponse(username=user.username, role=user.role, tenant_id=user.tenant_id)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

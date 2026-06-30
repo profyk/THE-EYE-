@@ -1,10 +1,14 @@
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.api_key import ApiKey
 
 
 class Tenant(Base):
@@ -19,3 +23,7 @@ class Tenant(Base):
     paddle_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     paddle_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     paddle_subscription_status: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    api_keys: Mapped[list["ApiKey"]] = relationship(
+        back_populates="tenant", cascade="all, delete-orphan", lazy="selectin"
+    )

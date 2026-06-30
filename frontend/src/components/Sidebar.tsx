@@ -33,6 +33,7 @@ const ICONS: Record<string, React.ReactElement> = {
   chain:     <Icon d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" d2="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />,
   investigate:<Icon d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3M6.343 6.343l-.707-.707M12 21v-1M4.22 19.78l.707-.707M17.657 6.343l.707-.707M19.78 19.78l-.707-.707" d2="M12 14a2 2 0 100-4 2 2 0 000 4z" />,
   accesslog: <Icon d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />,
+  apikeys:   <Icon d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />,
   intrusion: <Icon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
   sources:   <Icon d="M5 12H3m4.22-4.22L5.8 6.35M12 5V3m4.22 2.78l1.42-1.42M19 12h2m-4.22 4.22l1.42 1.42M12 19v2m-4.22-2.78l-1.42 1.42M6 12a6 6 0 1112 0 6 6 0 01-12 0z" />,
   manageusers:<Icon d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" d2="M12 11a4 4 0 100-8 4 4 0 000 8zM20 8v6M23 11h-6" />,
@@ -105,6 +106,7 @@ export default function Sidebar() {
   const adminItems = [
     ...(isAdmin          ? [{ href: "/admin/sources",           label: "Sources",           icon: ICONS.sources     }] : []),
     ...(isAdmin          ? [{ href: "/admin/users",             label: "Manage Users",      icon: ICONS.manageusers }] : []),
+    ...(isAdmin          ? [{ href: "/admin/api-keys",          label: "API Keys",          icon: ICONS.apikeys     }] : []),
     ...(canSeeDeletion   ? [{ href: "/admin/deletion-requests", label: "Deletion Requests", icon: ICONS.deletion    }] : []),
     ...(canSeeReports    ? [{ href: "/admin/whistleblower",     label: "Reports",           icon: ICONS.reports     }] : []),
     ...(isAdmin          ? [{ href: "/settings",                label: "Settings",          icon: ICONS.settings    }] : []),
