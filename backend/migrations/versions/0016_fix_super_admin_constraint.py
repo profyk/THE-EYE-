@@ -18,7 +18,7 @@ def upgrade() -> None:
     # Rename any leftover platform_admin rows.
     op.execute("UPDATE app.users SET role = 'super_admin' WHERE role = 'platform_admin'")
 
-    # Idempotent constraint swap -- safe whether 0015 ran or not.
+    # Drop old constraint if it still exists (0015 may or may not have run).
     op.execute("""
         DO $$ BEGIN
             IF EXISTS (
@@ -30,7 +30,12 @@ def upgrade() -> None:
                 ALTER TABLE app.users
                     DROP CONSTRAINT ck_users_tenant_required_unless_platform_admin;
             END IF;
+        END $$
+    """)
 
+    # Drop new constraint if 0015 already created it (idempotent).
+    op.execute("""
+        DO $$ BEGIN
             IF EXISTS (
                 SELECT 1 FROM information_schema.table_constraints
                 WHERE constraint_schema = 'app'
@@ -40,12 +45,16 @@ def upgrade() -> None:
                 ALTER TABLE app.users
                     DROP CONSTRAINT ck_users_tenant_required_unless_super_admin;
             END IF;
-        END $$;
-
-        ALTER TABLE app.users
-            ADD CONSTRAINT ck_users_tenant_required_unless_super_admin
-            CHECK (tenant_id IS NOT NULL OR role = 'super_admin');
+        END $$
     """)
+
+    # Create the correct constraint.
+    op.create_check_constraint(
+        "ck_users_tenant_required_unless_super_admin",
+        "users",
+        "tenant_id IS NOT NULL OR role = 'super_admin'",
+        schema="app",
+    )
 
 
 def downgrade() -> None:
@@ -60,9 +69,12 @@ def downgrade() -> None:
                 ALTER TABLE app.users
                     DROP CONSTRAINT ck_users_tenant_required_unless_super_admin;
             END IF;
-        END $$;
-        ALTER TABLE app.users
-            ADD CONSTRAINT ck_users_tenant_required_unless_platform_admin
-            CHECK (tenant_id IS NOT NULL OR role = 'platform_admin');
+        END $$
     """)
+    op.create_check_constraint(
+        "ck_users_tenant_required_unless_platform_admin",
+        "users",
+        "tenant_id IS NOT NULL OR role = 'platform_admin'",
+        schema="app",
+    )
     op.execute("UPDATE app.users SET role = 'platform_admin' WHERE role = 'super_admin'")

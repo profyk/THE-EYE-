@@ -16,7 +16,7 @@ import secrets
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
@@ -119,3 +119,51 @@ async def recovery_reset_password(
         "created": False,
         "message": f"Password reset for '{user.username}'. Remove RECOVERY_TOKEN from Railway env vars now.",
     }
+
+
+class PromoteRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+
+
+@router.post("/promote-super-admin", status_code=status.HTTP_200_OK)
+async def promote_super_admin(
+    data: PromoteRequest,
+    x_recovery_token: str | None = Header(default=None, alias="X-Recovery-Token"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Fix the DB constraint and promote an existing user to super_admin.
+    Use this when reset-password with role=super_admin returns 500."""
+    _check_token(x_recovery_token)
+
+    user = (await db.execute(select(User).where(User.username == data.username))).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"User '{data.username}' not found.")
+
+    # Fix constraint in-place using raw DDL (safe whether migration ran or not).
+    await db.execute(text("""
+        DO $$ BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.table_constraints
+                WHERE constraint_schema = 'app' AND table_name = 'users'
+                  AND constraint_name = 'ck_users_tenant_required_unless_platform_admin'
+            ) THEN
+                ALTER TABLE app.users DROP CONSTRAINT ck_users_tenant_required_unless_platform_admin;
+            END IF;
+            IF EXISTS (
+                SELECT 1 FROM information_schema.table_constraints
+                WHERE constraint_schema = 'app' AND table_name = 'users'
+                  AND constraint_name = 'ck_users_tenant_required_unless_super_admin'
+            ) THEN
+                ALTER TABLE app.users DROP CONSTRAINT ck_users_tenant_required_unless_super_admin;
+            END IF;
+        END $$
+    """))
+    await db.execute(text(
+        "ALTER TABLE app.users ADD CONSTRAINT ck_users_tenant_required_unless_super_admin "
+        "CHECK (tenant_id IS NOT NULL OR role = 'super_admin')"
+    ))
+    await db.execute(
+        update(User).where(User.username == data.username).values(role="super_admin", tenant_id=None)
+    )
+    await db.commit()
+    return {"ok": True, "message": f"'{data.username}' is now super_admin. Remove RECOVERY_TOKEN now."}
