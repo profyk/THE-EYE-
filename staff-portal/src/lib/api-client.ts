@@ -187,3 +187,154 @@ export async function staffAssignPlan(
     body: JSON.stringify({ plan_id: planId, paddle_subscription_status: subscriptionStatus }),
   });
 }
+
+// ── Staff admin management ────────────────────────────────────────────────────
+
+export interface StaffAdmin {
+  id: string;
+  username: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export async function listStaffAdmins(): Promise<StaffAdmin[]> {
+  return request<StaffAdmin[]>("/v1/staff/admins");
+}
+
+export async function createStaffAdmin(username: string, password: string): Promise<StaffAdmin> {
+  return request<StaffAdmin>("/v1/staff/admins", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+}
+
+export async function suspendStaffAdmin(id: string): Promise<StaffAdmin> {
+  return request<StaffAdmin>(`/v1/staff/admins/${id}/suspend`, { method: "POST" });
+}
+
+export async function activateStaffAdmin(id: string): Promise<StaffAdmin> {
+  return request<StaffAdmin>(`/v1/staff/admins/${id}/activate`, { method: "POST" });
+}
+
+export async function deleteStaffAdmin(id: string): Promise<void> {
+  await request<void>(`/v1/staff/admins/${id}`, { method: "DELETE" });
+}
+
+// ── Client user management ────────────────────────────────────────────────────
+
+export async function suspendClientUser(id: string): Promise<UserWithTenant> {
+  return request<UserWithTenant>(`/v1/staff/users/${id}/suspend`, { method: "POST" });
+}
+
+export async function activateClientUser(id: string): Promise<UserWithTenant> {
+  return request<UserWithTenant>(`/v1/staff/users/${id}/activate`, { method: "POST" });
+}
+
+export async function resetClientUserPassword(id: string): Promise<{ temp_password: string }> {
+  return request<{ temp_password: string }>(`/v1/staff/users/${id}/reset-password`, { method: "POST" });
+}
+
+// ── Platform API keys ─────────────────────────────────────────────────────────
+
+export interface StaffApiKey {
+  id: string;
+  tenant_id: string;
+  tenant_name: string;
+  name: string;
+  key_prefix: string;
+  is_active: boolean;
+  last_used_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+  created_by_username: string | null;
+}
+
+export async function listAllApiKeys(): Promise<StaffApiKey[]> {
+  return request<StaffApiKey[]>("/v1/staff/api-keys");
+}
+
+export async function revokeApiKey(id: string): Promise<void> {
+  await request<void>(`/v1/staff/api-keys/${id}`, { method: "DELETE" });
+}
+
+// ── Revenue intelligence ──────────────────────────────────────────────────────
+
+export interface RevenueStats {
+  mrr: number;
+  arr: number;
+  paying_count: number;
+  trialing_count: number;
+  past_due_count: number;
+  churned_count: number;
+  growth_30d: number;
+  monthly_trend: { month: string; count: number }[];
+}
+
+export async function getRevenueStats(): Promise<RevenueStats> {
+  return request<RevenueStats>("/v1/staff/revenue");
+}
+
+// ── Tenant users ──────────────────────────────────────────────────────────────
+
+export async function getTenantUsers(tenantId: string): Promise<UserWithTenant[]> {
+  return request<UserWithTenant[]>(`/v1/staff/tenants/${tenantId}/users`);
+}
+
+// ── Support notes ─────────────────────────────────────────────────────────────
+
+export interface StaffNote {
+  id: string;
+  tenant_id: string;
+  author_username: string;
+  body: string;
+  created_at: string;
+}
+
+export async function getTenantNotes(tenantId: string): Promise<StaffNote[]> {
+  return request<StaffNote[]>(`/v1/staff/tenants/${tenantId}/notes`);
+}
+
+export async function addTenantNote(tenantId: string, body: string): Promise<StaffNote> {
+  return request<StaffNote>(`/v1/staff/tenants/${tenantId}/notes`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  });
+}
+
+export async function deleteTenantNote(tenantId: string, noteId: string): Promise<void> {
+  await request<void>(`/v1/staff/tenants/${tenantId}/notes/${noteId}`, { method: "DELETE" });
+}
+
+// ── Announcements ─────────────────────────────────────────────────────────────
+
+export interface StaffAnnouncement {
+  id: string;
+  title: string;
+  body: string;
+  severity: string;
+  is_active: boolean;
+  created_by: string;
+  created_at: string;
+}
+
+export async function listAnnouncements(): Promise<StaffAnnouncement[]> {
+  return request<StaffAnnouncement[]>("/v1/staff/announcements");
+}
+
+export async function createAnnouncement(title: string, body: string, severity: string): Promise<StaffAnnouncement> {
+  return request<StaffAnnouncement>("/v1/staff/announcements", {
+    method: "POST",
+    body: JSON.stringify({ title, body, severity }),
+  });
+}
+
+export async function toggleAnnouncement(id: string, is_active: boolean): Promise<StaffAnnouncement> {
+  return request<StaffAnnouncement>(`/v1/staff/announcements/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ is_active }),
+  });
+}
+
+export async function deleteAnnouncement(id: string): Promise<void> {
+  await request<void>(`/v1/staff/announcements/${id}`, { method: "DELETE" });
+}
