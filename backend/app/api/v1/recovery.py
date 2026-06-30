@@ -42,6 +42,7 @@ def _check_token(x_recovery_token: str | None) -> None:
 class ResetRequest(BaseModel):
     username: str = Field(min_length=1, max_length=64)
     new_password: str = Field(min_length=12, max_length=256)
+    role: str = Field(default="admin")
 
 
 @router.get("/status", status_code=status.HTTP_200_OK)
@@ -77,6 +78,17 @@ async def recovery_reset_password(
     user = await get_user_by_username(db, data.username)
 
     if user is None:
+        if data.role == "platform_admin":
+            user = await create_user(
+                db,
+                UserCreate(username=data.username, password=data.new_password, role="platform_admin"),
+            )
+            return {
+                "ok": True,
+                "created": True,
+                "message": f"Created platform_admin '{user.username}'. Remove RECOVERY_TOKEN now.",
+            }
+
         tenants = await list_tenants(db)
         if tenants:
             tenant = tenants[0]
@@ -90,12 +102,12 @@ async def recovery_reset_password(
             UserCreate(
                 username=data.username,
                 password=data.new_password,
-                role="admin",
+                role=data.role,
                 tenant_id=tenant.id,
             ),
         )
         msg = (
-            f"Created admin user '{user.username}' in tenant '{tenant.name}'"
+            f"Created {data.role} user '{user.username}' in tenant '{tenant.name}'"
             + (" (new tenant also created)" if created_tenant else "")
             + ". Remove RECOVERY_TOKEN from Railway env vars now."
         )
