@@ -4,8 +4,8 @@ import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { login as loginRequest, ApiError } from "@/lib/api-client";
-import { isLoggedIn, setSession } from "@/lib/auth";
+import { login as loginRequest, verifySession, ApiError } from "@/lib/api-client";
+import { clearSession, isLoggedIn, setSession } from "@/lib/auth";
 import Panel from "@/components/Panel";
 import Button from "@/components/Button";
 
@@ -18,7 +18,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isLoggedIn()) router.replace("/overview");
+    if (!isLoggedIn()) return;
+    // Confirm the cookie is still valid before silently redirecting.
+    // If the cookie expired or was cleared, isLoggedIn() (localStorage only)
+    // would still be true and we'd redirect to a broken panel.
+    verifySession().then(() => router.replace("/overview")).catch(() => clearSession());
   }, [router]);
 
   async function handleSubmit(e: FormEvent) {

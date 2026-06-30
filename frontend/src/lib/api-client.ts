@@ -23,6 +23,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (res.status === 401) {
     clearSession();
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      window.location.replace("/login");
+    }
   }
   if (!res.ok) {
     const body = await res.text();
@@ -42,6 +45,10 @@ export async function signup(
     method: "POST",
     body: JSON.stringify({ tenant_name: tenantName, tenant_slug: tenantSlug, username, password }),
   });
+}
+
+export async function verifySession(): Promise<Session> {
+  return request<Session>("/v1/auth/me");
 }
 
 export async function login(username: string, password: string): Promise<Session> {

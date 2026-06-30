@@ -2,24 +2,30 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { isLoggedIn } from "@/lib/auth";
+import { clearSession, isLoggedIn, setSession } from "@/lib/auth";
+import { verifySession } from "@/lib/api-client";
 
 export function useRequireAuth(): boolean {
   const router = useRouter();
-  // Must start false on both server and client renders -- a lazy initializer
-  // that reads localStorage would render differently during SSR (no window)
-  // vs. client hydration, causing a hydration mismatch. Setting it after mount
-  // in the effect is correct here even though it's a setState-in-effect: this
-  // is an auth gate, not a data fetch, so there's no other way to derive it.
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn()) {
       router.replace("/login");
-    } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setReady(true);
+      return;
     }
+    // Verify the httpOnly cookie is still valid — localStorage can be stale
+    // if the session expired or the browser cleared the cookie.
+    verifySession()
+      .then((session) => {
+        setSession(session);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setReady(true);
+      })
+      .catch(() => {
+        clearSession();
+        router.replace("/login");
+      });
   }, [router]);
 
   return ready;

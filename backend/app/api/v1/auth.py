@@ -15,7 +15,7 @@ from app.schemas.event import EventCreate
 from app.schemas.user import LoginRequest, LoginResponse
 from app.services.geoip_service import lookup_geoip
 from app.services.source_service import get_source_by_name
-from app.services.user_service import authenticate_user, create_session, delete_session_by_token, get_user_by_username
+from app.services.user_service import authenticate_user, create_session, delete_session_by_token, get_user_by_username, get_user_by_session_token
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
 
@@ -110,6 +110,17 @@ async def login(
         max_age=settings.session_token_ttl_hours * 3600,
         path="/",
     )
+    return LoginResponse(username=user.username, role=user.role)
+
+
+@router.get("/me", response_model=LoginResponse)
+async def me(request: Request, db: AsyncSession = Depends(get_db)) -> LoginResponse:
+    raw_token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not raw_token:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
+    user = await get_user_by_session_token(db, raw_token)
+    if user is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired session")
     return LoginResponse(username=user.username, role=user.role)
 
 
