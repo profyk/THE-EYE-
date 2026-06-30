@@ -16,7 +16,7 @@ import secrets
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
@@ -139,9 +139,11 @@ async def promote_super_admin(
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"User '{data.username}' not found.")
 
-    # Just flip the role — tenant_id stays set so the existing constraint
-    # (tenant_id IS NOT NULL OR role = ...) keeps passing. The staff portal
-    # gates on role only; having a tenant_id on a super_admin is harmless.
-    user.role = "super_admin"
+    # Raw SQL UPDATE bypasses ORM tracking. tenant_id stays untouched so
+    # the existing constraint (tenant_id IS NOT NULL OR role = ...) still passes.
+    await db.execute(
+        text("UPDATE app.users SET role = 'super_admin' WHERE username = :u"),
+        {"u": data.username},
+    )
     await db.commit()
     return {"ok": True, "message": f"'{data.username}' is now super_admin. Remove RECOVERY_TOKEN now."}
