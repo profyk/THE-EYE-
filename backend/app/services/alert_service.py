@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert_acknowledgment import AlertAcknowledgment
 from app.models.ledger_event import LedgerEvent
+from app.services.event_search import agent_source_filter
 
 FAILED_LOGIN_WINDOW_MINUTES = 15
 FAILED_LOGIN_THRESHOLD = 5
@@ -69,6 +70,7 @@ async def _failed_login_alerts(db: AsyncSession, now: datetime, *, tenant_id: UU
             LedgerEvent.outcome == "failure",
             LedgerEvent.occurred_at >= window_start,
             LedgerEvent.tenant_id == tenant_id,
+            agent_source_filter(tenant_id),
         )
         .group_by(LedgerEvent.actor_id)
         .having(func.count() >= FAILED_LOGIN_THRESHOLD)
@@ -100,6 +102,7 @@ async def _bulk_export_alerts(db: AsyncSession, now: datetime, *, tenant_id: UUI
             LedgerEvent.event_category == "data_access",
             LedgerEvent.occurred_at >= window_start,
             LedgerEvent.tenant_id == tenant_id,
+            agent_source_filter(tenant_id),
         )
         .group_by(LedgerEvent.actor_id)
         .having(func.count() >= BULK_EXPORT_THRESHOLD)
@@ -129,6 +132,7 @@ async def _critical_financial_alerts(db: AsyncSession, now: datetime, *, tenant_
         LedgerEvent.severity.in_(["high", "critical"]),
         LedgerEvent.occurred_at >= lookback,
         LedgerEvent.tenant_id == tenant_id,
+        agent_source_filter(tenant_id),
     )
     rows = (await db.execute(stmt)).scalars().all()
 

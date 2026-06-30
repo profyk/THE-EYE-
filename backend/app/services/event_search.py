@@ -5,12 +5,25 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
+from app.models.ingestion_source import IngestionSource
 from app.models.ledger_event import LedgerEvent
+
+
+def agent_source_filter(tenant_id: UUID):
+    """Restricts LedgerEvent rows to those ingested by the agent (source_kind='agent').
+    Only valid when tenant_id is known -- never call with None."""
+    return LedgerEvent.source_id.in_(
+        select(IngestionSource.id).where(
+            IngestionSource.source_kind == "agent",
+            IngestionSource.tenant_id == tenant_id,
+        )
+    )
 
 
 def build_event_search_stmt(
     *,
     tenant_id: UUID | None,
+    agent_only: bool = True,
     actor_id: str | None = None,
     event_type: str | None = None,
     event_category: str | None = None,
@@ -35,6 +48,8 @@ def build_event_search_stmt(
     # this is the one filter that's never optional for a real business user.
     if tenant_id is not None:
         stmt = stmt.where(LedgerEvent.tenant_id == tenant_id)
+        if agent_only:
+            stmt = stmt.where(agent_source_filter(tenant_id))
     if actor_id:
         stmt = stmt.where(LedgerEvent.actor_id == actor_id)
     if event_type:

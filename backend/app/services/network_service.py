@@ -4,6 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ledger_event import LedgerEvent
+from app.services.event_search import agent_source_filter
 
 MAX_EDGES = 75
 
@@ -19,7 +20,7 @@ async def get_actor_target_network(db: AsyncSession, *, tenant_id: UUID) -> dict
             LedgerEvent.target_id,
             func.count().label("weight"),
         )
-        .where(LedgerEvent.target_id.is_not(None), LedgerEvent.tenant_id == tenant_id)
+        .where(LedgerEvent.target_id.is_not(None), LedgerEvent.tenant_id == tenant_id, agent_source_filter(tenant_id))
         .group_by(LedgerEvent.actor_id, LedgerEvent.target_type, LedgerEvent.target_id)
         .order_by(func.count().desc())
         .limit(MAX_EDGES)

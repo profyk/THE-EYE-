@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ingestion_source import IngestionSource
 from app.models.ledger_event import LedgerEvent
+from app.services.event_search import agent_source_filter
 
 _RISK_SCORE_CACHE_TTL_SECONDS = 20
 # Keyed by tenant_id -- a single shared tuple here would leak one tenant's
@@ -40,12 +41,13 @@ MAX_RISK_SCORE = 100
 
 async def get_overview_stats(db: AsyncSession, *, tenant_id: UUID) -> dict:
     start_of_today = datetime.combine(datetime.now(timezone.utc).date(), time.min, tzinfo=timezone.utc)
+    af = agent_source_filter(tenant_id)
 
     events_today = (
         await db.execute(
             select(func.count())
             .select_from(LedgerEvent)
-            .where(LedgerEvent.occurred_at >= start_of_today, LedgerEvent.tenant_id == tenant_id)
+            .where(LedgerEvent.occurred_at >= start_of_today, LedgerEvent.tenant_id == tenant_id, af)
         )
     ).scalar_one()
 
@@ -53,7 +55,7 @@ async def get_overview_stats(db: AsyncSession, *, tenant_id: UUID) -> dict:
         await db.execute(
             select(func.count())
             .select_from(LedgerEvent)
-            .where(LedgerEvent.severity.in_(["high", "critical"]), LedgerEvent.tenant_id == tenant_id)
+            .where(LedgerEvent.severity.in_(["high", "critical"]), LedgerEvent.tenant_id == tenant_id, af)
         )
     ).scalar_one()
 
@@ -87,7 +89,7 @@ async def _compute_actor_risk_scores(db: AsyncSession, *, tenant_id: UUID) -> li
             func.count().filter(LedgerEvent.event_category == "financial_transaction").label("financial_count"),
             func.max(LedgerEvent.occurred_at).label("last_seen_at"),
         )
-        .where(LedgerEvent.tenant_id == tenant_id)
+        .where(LedgerEvent.tenant_id == tenant_id, agent_source_filter(tenant_id))
         .group_by(LedgerEvent.actor_id)
         .order_by(func.count().desc())
     )
@@ -120,15 +122,16 @@ async def _compute_actor_risk_scores(db: AsyncSession, *, tenant_id: UUID) -> li
 
 async def get_analytics(db: AsyncSession, *, tenant_id: UUID) -> dict:
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    af = agent_source_filter(tenant_id)
 
     total = (
-        await db.execute(select(func.count()).select_from(LedgerEvent).where(LedgerEvent.tenant_id == tenant_id))
+        await db.execute(select(func.count()).select_from(LedgerEvent).where(LedgerEvent.tenant_id == tenant_id, af))
     ).scalar_one()
 
     day_rows = (
         await db.execute(
             select(func.date_trunc("day", LedgerEvent.occurred_at).label("day"), func.count().label("count"))
-            .where(LedgerEvent.tenant_id == tenant_id, LedgerEvent.occurred_at >= thirty_days_ago)
+            .where(LedgerEvent.tenant_id == tenant_id, LedgerEvent.occurred_at >= thirty_days_ago, af)
             .group_by(func.date_trunc("day", LedgerEvent.occurred_at))
             .order_by(func.date_trunc("day", LedgerEvent.occurred_at))
         )
@@ -137,7 +140,7 @@ async def get_analytics(db: AsyncSession, *, tenant_id: UUID) -> dict:
     cat_rows = (
         await db.execute(
             select(LedgerEvent.event_category, func.count().label("count"))
-            .where(LedgerEvent.tenant_id == tenant_id)
+            .where(LedgerEvent.tenant_id == tenant_id, af)
             .group_by(LedgerEvent.event_category)
             .order_by(func.count().desc())
         )
@@ -146,7 +149,7 @@ async def get_analytics(db: AsyncSession, *, tenant_id: UUID) -> dict:
     sev_rows = (
         await db.execute(
             select(LedgerEvent.severity, func.count().label("count"))
-            .where(LedgerEvent.tenant_id == tenant_id)
+            .where(LedgerEvent.tenant_id == tenant_id, af)
             .group_by(LedgerEvent.severity)
             .order_by(func.count().desc())
         )
@@ -155,7 +158,7 @@ async def get_analytics(db: AsyncSession, *, tenant_id: UUID) -> dict:
     type_rows = (
         await db.execute(
             select(LedgerEvent.event_type, func.count().label("count"))
-            .where(LedgerEvent.tenant_id == tenant_id)
+            .where(LedgerEvent.tenant_id == tenant_id, af)
             .group_by(LedgerEvent.event_type)
             .order_by(func.count().desc())
             .limit(10)
@@ -165,7 +168,7 @@ async def get_analytics(db: AsyncSession, *, tenant_id: UUID) -> dict:
     outcome_rows = (
         await db.execute(
             select(LedgerEvent.outcome, func.count().label("count"))
-            .where(LedgerEvent.tenant_id == tenant_id)
+            .where(LedgerEvent.tenant_id == tenant_id, af)
             .group_by(LedgerEvent.outcome)
             .order_by(func.count().desc())
         )
@@ -177,7 +180,7 @@ async def get_analytics(db: AsyncSession, *, tenant_id: UUID) -> dict:
                 func.extract("hour", LedgerEvent.occurred_at).label("hour"),
                 func.count().label("count"),
             )
-            .where(LedgerEvent.tenant_id == tenant_id)
+            .where(LedgerEvent.tenant_id == tenant_id, af)
             .group_by(func.extract("hour", LedgerEvent.occurred_at))
             .order_by(func.extract("hour", LedgerEvent.occurred_at))
         )
@@ -202,7 +205,7 @@ async def get_activity_heatmap(db: AsyncSession, *, tenant_id: UUID) -> list[dic
                 func.extract("hour", LedgerEvent.occurred_at).label("hour"),
                 func.count().label("count"),
             )
-            .where(LedgerEvent.tenant_id == tenant_id)
+            .where(LedgerEvent.tenant_id == tenant_id, agent_source_filter(tenant_id))
             .group_by(
                 func.extract("dow", LedgerEvent.occurred_at),
                 func.extract("hour", LedgerEvent.occurred_at),

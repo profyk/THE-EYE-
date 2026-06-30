@@ -21,7 +21,7 @@ from app.schemas.event import (
     EventCreate,
     EventRead,
 )
-from app.services.event_search import build_event_search_stmt
+from app.services.event_search import agent_source_filter, build_event_search_stmt
 
 router = APIRouter(prefix="/v1", tags=["events"])
 
@@ -128,7 +128,11 @@ async def get_event(
 ) -> EventRead:
     row = (
         await db.execute(
-            select(LedgerEvent).where(LedgerEvent.id == event_id, LedgerEvent.tenant_id == tenant_id)
+            select(LedgerEvent).where(
+                LedgerEvent.id == event_id,
+                LedgerEvent.tenant_id == tenant_id,
+                agent_source_filter(tenant_id),
+            )
         )
     ).scalar_one_or_none()
     if row is None:

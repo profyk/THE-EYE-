@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import NavBar from "@/components/NavBar";
+import { useRequireAuth } from "@/lib/useRequireAuth";
 import {
   getPublicPlans,
   getTenantSubscription,
@@ -131,6 +133,7 @@ function PlanCard({
 }
 
 export default function BillingPage() {
+  const ready = useRequireAuth();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [sub, setSub] = useState<SubscriptionOut | null>(null);
   const [loading, setLoading] = useState(true);
@@ -138,6 +141,7 @@ export default function BillingPage() {
   const [message, setMessage] = useState<{ text: string; type: "info" | "error" } | null>(null);
 
   useEffect(() => {
+    if (!ready) return;
     async function load() {
       // Fetch plans and subscription independently so one failure doesn't hide the other.
       try {
@@ -163,7 +167,7 @@ export default function BillingPage() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [ready]);
 
   async function handleSubscribe(plan: Plan, cycle: "monthly" | "annual") {
     setCheckoutLoading(plan.id + cycle);
@@ -188,7 +192,10 @@ export default function BillingPage() {
   const statusCls = STATUS_COLOR[statusKey] ?? "text-[var(--muted)] bg-[var(--surface)] border-[var(--border)]";
   const limits = sub?.plan?.limits;
 
+  if (!ready) return null;
+
   return (
+    <NavBar>
     <div className="p-8 max-w-5xl space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-[var(--text)] tracking-tight">Billing & Subscription</h1>
@@ -297,5 +304,6 @@ export default function BillingPage() {
         </p>
       </div>
     </div>
+    </NavBar>
   );
 }

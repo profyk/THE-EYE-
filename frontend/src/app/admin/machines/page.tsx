@@ -1,7 +1,10 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import NavBar from "@/components/NavBar";
 import { listMachines, AgentMachine, ApiError } from "@/lib/api-client";
 import { useRequireAuth } from "@/lib/useRequireAuth";
+import { getSession } from "@/lib/auth";
 
 function timeAgo(d: string | null) {
   if (!d) return "Never";
@@ -27,6 +30,7 @@ const OS_LABEL: Record<string, string> = {
 
 export default function MachinesPage() {
   const ready = useRequireAuth();
+  const router = useRouter();
   const [machines, setMachines] = useState<AgentMachine[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +58,14 @@ export default function MachinesPage() {
 
   if (!ready) return null;
 
+  const session = getSession();
+  if (session?.role !== "admin") {
+    router.replace("/overview");
+    return null;
+  }
+
   return (
+    <NavBar>
     <div className="p-8 max-w-5xl space-y-8">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -202,5 +213,6 @@ export default function MachinesPage() {
         </ol>
       </div>
     </div>
+    </NavBar>
   );
 }
