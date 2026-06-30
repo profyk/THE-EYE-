@@ -28,6 +28,8 @@ export function proxy(request: NextRequest) {
     // Restrict where forms can submit to -- prevents data exfil via hidden forms.
     "form-action 'self'",
     "frame-ancestors 'none'",
+    // Allow the PWA service worker to be installed from this origin.
+    "worker-src 'self'",
   ].join("; ");
 
   const requestHeaders = new Headers(request.headers);

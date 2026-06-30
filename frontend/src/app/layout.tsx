@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
+import PwaInit from "@/components/PwaInit";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -21,6 +22,13 @@ export const metadata: Metadata = {
     apple: "/app-icon.png",
     shortcut: "/app-icon.png",
   },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "THE EYE",
+  },
+  formatDetection: { telephone: false },
 };
 
 // Runs before React hydrates, directly setting the class on <html> from
@@ -52,9 +60,13 @@ export default async function RootLayout({
       className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
+        <meta name="theme-color" content="#00d4ff" />
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: NO_FLASH_THEME_SCRIPT }} />
       </head>
-      <body className="min-h-full flex flex-col bg-void text-text">{children}</body>
+      <body className="min-h-full flex flex-col bg-void text-text">
+        <PwaInit />
+        {children}
+      </body>
     </html>
   );
 }
