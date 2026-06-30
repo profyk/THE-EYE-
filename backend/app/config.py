@@ -56,6 +56,14 @@ class Settings(BaseSettings):
     def cookie_secure(self) -> bool:
         return self.env != "development"
 
+    @property
+    def cookie_samesite(self) -> str:
+        # Frontend (Vercel) and backend (Railway) live on different domains in
+        # production, so cross-site fetch requests must use SameSite=None.
+        # SameSite=None requires Secure=True, which cookie_secure already enforces.
+        # In development both run on localhost so Strict is fine.
+        return "none" if self.env != "development" else "strict"
+
     # AI investigate feature (Phase 2E) -- optional. Empty means the feature
     # returns a clear "not configured" error rather than failing unexpectedly.
     anthropic_api_key: str = ""

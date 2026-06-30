@@ -106,7 +106,7 @@ async def login(
         value=token,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="strict",
+        samesite=settings.cookie_samesite,
         max_age=settings.session_token_ttl_hours * 3600,
         path="/",
     )
@@ -129,4 +129,9 @@ async def logout(request: Request, response: Response, db: AsyncSession = Depend
     raw_token = request.cookies.get(SESSION_COOKIE_NAME)
     if raw_token:
         await delete_session_by_token(db, raw_token)
-    response.delete_cookie(SESSION_COOKIE_NAME, path="/")
+    response.delete_cookie(
+        SESSION_COOKIE_NAME,
+        path="/",
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+    )
