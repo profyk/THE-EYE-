@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import NavBar from "@/components/NavBar";
@@ -153,8 +153,7 @@ export default function AnalyticsPage() {
   const peakDay = data?.events_by_day.reduce((a, b) => (b.count > a.count ? b : a), { date: "—", count: 0 });
 
   return (
-    <div className="flex flex-1 flex-col">
-      <NavBar />
+    <NavBar>
       <main className="p-6 flex-1 space-y-6">
         <h1 className="text-lg font-semibold">Analytics</h1>
 
@@ -245,6 +244,6 @@ export default function AnalyticsPage() {
           </>
         )}
       </main>
-    </div>
+    </NavBar>
   );
 }

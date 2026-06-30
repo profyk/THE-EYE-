@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { FormEvent, useEffect, useState } from "react";
 import NavBar from "@/components/NavBar";
@@ -40,12 +40,11 @@ export default function UsersAdminPage() {
 
   if (session?.role !== "admin") {
     return (
-      <div className="flex flex-1 flex-col">
-        <NavBar />
+      <NavBar>
         <main className="p-6">
           <p className="text-sm text-danger">You do not have permission to view this page.</p>
         </main>
-      </div>
+      </NavBar>
     );
   }
 
@@ -87,8 +86,7 @@ export default function UsersAdminPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col">
-      <NavBar />
+    <NavBar>
       <main className="p-6 flex-1 max-w-3xl">
         <h1 className="text-lg font-semibold mb-4">Users</h1>
 
@@ -197,6 +195,6 @@ export default function UsersAdminPage() {
           </table>
         </div>
       </main>
-    </div>
+    </NavBar>
   );
 }

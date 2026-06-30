@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import NavBar from "@/components/NavBar";
@@ -68,8 +68,7 @@ export default function AlertsPage() {
   if (!ready) return null;
 
   return (
-    <div className="flex flex-1 flex-col">
-      <NavBar />
+    <NavBar>
       <main className="p-6 flex-1 max-w-3xl">
         <h1 className="text-lg font-semibold mb-1">Alerts</h1>
         <p className="text-sm text-muted mb-4">Real threshold rules evaluated against the live ledger -- not simulated.</p>
@@ -131,6 +130,6 @@ export default function AlertsPage() {
           </div>
         )}
       </main>
-    </div>
+    </NavBar>
   );
 }

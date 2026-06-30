@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import NavBar from "@/components/NavBar";
@@ -198,8 +198,7 @@ export default function SettingsPage() {
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
   return (
-    <div className="flex flex-1 flex-col">
-      <NavBar />
+    <NavBar>
       <main className="p-6 flex-1 max-w-2xl space-y-6">
         <h1 className="text-lg font-semibold">Settings</h1>
 
@@ -304,6 +303,6 @@ export default function SettingsPage() {
           </div>
         </Panel>
       </main>
-    </div>
+    </NavBar>
   );
 }

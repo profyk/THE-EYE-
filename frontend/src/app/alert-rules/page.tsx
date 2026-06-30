@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -81,8 +81,7 @@ export default function AlertRulesPage() {
   if (!ready) return null;
 
   return (
-    <div className="flex flex-1 flex-col">
-      <NavBar />
+    <NavBar>
       <main className="p-6 flex-1 max-w-3xl">
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-lg font-semibold">Alert Rules</h1>
@@ -131,6 +130,6 @@ export default function AlertRulesPage() {
           </p>
         </div>
       </main>
-    </div>
+    </NavBar>
   );
 }

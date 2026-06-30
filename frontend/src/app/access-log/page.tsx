@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import NavBar from "@/components/NavBar";
@@ -38,8 +38,7 @@ export default function AccessLogPage() {
   if (!ready) return null;
 
   return (
-    <div className="flex flex-1 flex-col">
-      <NavBar />
+    <NavBar>
       <main className="p-6 flex-1">
         <h1 className="text-lg font-semibold mb-1">Access Log</h1>
         <p className="text-sm text-muted mb-4">
@@ -77,6 +76,6 @@ export default function AccessLogPage() {
           </div>
         )}
       </main>
-    </div>
+    </NavBar>
   );
 }

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -125,8 +125,7 @@ export default function ForensicsPage() {
   if (!ready) return null;
 
   return (
-    <div className="flex flex-1 flex-col">
-      <NavBar />
+    <NavBar>
       <main className="p-6 flex-1 max-w-4xl">
         <h1 className="text-lg font-semibold mb-1 no-print">Forensics</h1>
         <p className="text-sm text-muted mb-6 no-print">
@@ -207,6 +206,6 @@ export default function ForensicsPage() {
           </section>
         )}
       </main>
-    </div>
+    </NavBar>
   );
 }

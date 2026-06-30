@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -25,8 +25,7 @@ export default function EventDetailPage() {
   if (!ready) return null;
 
   return (
-    <div className="flex flex-1 flex-col">
-      <NavBar />
+    <NavBar>
       <main className="p-6 flex-1">
         <Link href="/events" className="text-sm text-muted hover:text-accent transition-colors">
           ← Back to events
@@ -35,6 +34,6 @@ export default function EventDetailPage() {
         {error && <p className="text-sm text-danger">{error}</p>}
         {event && <EventDetailPanel event={event} />}
       </main>
-    </div>
+    </NavBar>
   );
 }

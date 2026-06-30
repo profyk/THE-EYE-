@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { FormEvent, useEffect, useState } from "react";
 import NavBar from "@/components/NavBar";
@@ -92,18 +92,16 @@ export default function DeletionRequestsPage() {
 
   if (!isAdmin && !isApprover) {
     return (
-      <div className="flex flex-1 flex-col">
-        <NavBar />
+      <NavBar>
         <main className="p-6">
           <p className="text-sm text-danger">You do not have permission to view this page.</p>
         </main>
-      </div>
+      </NavBar>
     );
   }
 
   return (
-    <div className="flex flex-1 flex-col">
-      <NavBar />
+    <NavBar>
       <main className="p-6 flex-1 max-w-3xl">
         <h1 className="text-lg font-semibold mb-1">Deletion Requests</h1>
         <p className="text-sm text-muted mb-4">
@@ -199,6 +197,6 @@ export default function DeletionRequestsPage() {
           {requests.length === 0 && <EmptyState>No deletion requests.</EmptyState>}
         </div>
       </main>
-    </div>
+    </NavBar>
   );
 }

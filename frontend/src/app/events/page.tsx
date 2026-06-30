@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -62,8 +62,7 @@ export default function EventsPage() {
   if (!ready) return null;
 
   return (
-    <div className="flex flex-1 flex-col">
-      <NavBar />
+    <NavBar>
       <main className="p-6 flex-1">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-lg font-semibold">Audit Events</h1>
@@ -80,6 +79,6 @@ export default function EventsPage() {
         {error && <p className="text-sm text-danger">{error}</p>}
         {!loading && !error && <EventTable events={events} highlightIds={newIds} />}
       </main>
-    </div>
+    </NavBar>
   );
 }

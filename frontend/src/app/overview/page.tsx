@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -95,8 +95,7 @@ export default function OverviewPage() {
   if (!ready) return null;
 
   return (
-    <div className="flex flex-1 flex-col">
-      <NavBar />
+    <NavBar>
       <main className="p-6 flex-1 space-y-6">
 
         {/* ── Page header ─────────────────────────────────────────────── */}
@@ -224,6 +223,6 @@ export default function OverviewPage() {
         )}
 
       </main>
-    </div>
+    </NavBar>
   );
 }

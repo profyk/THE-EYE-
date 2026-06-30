@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { FormEvent, useState } from "react";
 import NavBar from "@/components/NavBar";
@@ -31,8 +31,7 @@ export default function InvestigatePage() {
   if (!ready) return null;
 
   return (
-    <div className="flex flex-1 flex-col">
-      <NavBar />
+    <NavBar>
       <main className="p-6 flex-1 max-w-3xl">
         <h1 className="text-lg font-semibold mb-1 no-print">AI Investigate</h1>
         <p className="text-sm text-muted mb-4 no-print">
@@ -73,6 +72,6 @@ export default function InvestigatePage() {
           </div>
         )}
       </main>
-    </div>
+    </NavBar>
   );
 }

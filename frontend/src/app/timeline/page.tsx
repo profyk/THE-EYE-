@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import NavBar from "@/components/NavBar";
@@ -27,14 +27,13 @@ export default function TimelinePage() {
   if (!ready) return null;
 
   return (
-    <div className="flex flex-1 flex-col">
-      <NavBar />
+    <NavBar>
       <main className="p-6 flex-1">
         <h1 className="text-lg font-semibold mb-4">Timeline</h1>
         {loading && <p className="text-sm text-muted">Loading...</p>}
         {error && <p className="text-sm text-danger">{error}</p>}
         {!loading && !error && <TimelineView events={events} />}
       </main>
-    </div>
+    </NavBar>
   );
 }
