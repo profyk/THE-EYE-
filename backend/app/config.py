@@ -54,7 +54,11 @@ class Settings(BaseSettings):
 
     @property
     def cookie_secure(self) -> bool:
-        return self.env != "development"
+        # Must be True whenever SameSite=None: browsers silently demote
+        # SameSite=None cookies that lack Secure to SameSite=Lax, which blocks
+        # cross-site sending (Vercel → Railway). Chrome has a localhost
+        # exception so local HTTP dev still works with Secure=True.
+        return True
 
     @property
     def cookie_samesite(self) -> str:
