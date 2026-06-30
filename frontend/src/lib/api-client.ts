@@ -506,3 +506,22 @@ export async function createCheckout(
     body: JSON.stringify({ plan_id, billing_cycle }),
   });
 }
+
+// ── Agent Machines ────────────────────────────────────────────────────────────
+
+export interface AgentMachine {
+  id: string;
+  machine_id: string;
+  hostname: string;
+  os: string | null;
+  agent_version: string | null;
+  agent_label: string | null;
+  ip_address: string | null;
+  last_heartbeat_at: string | null;
+  registered_at: string;
+  is_online: boolean;
+}
+
+export async function listMachines(): Promise<AgentMachine[]> {
+  return request<AgentMachine[]>("/v1/agent/machines-portal");
+}

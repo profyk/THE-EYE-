@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"unsafe"
 
@@ -24,7 +25,7 @@ import (
 	eyetray "github.com/profyk/the-eye-agent/tray"
 )
 
-const Version = "1.0.0"
+const Version = "1.1.0"
 
 var (
 	flagSetup     = flag.Bool("setup", false, "run interactive setup wizard (opens console)")
@@ -120,6 +121,11 @@ func main() {
 		s = shipper.New(cfg, q)
 		go s.Run()
 
+		// Register this machine and start heartbeat for online presence.
+		hostname, _ := os.Hostname()
+		s.Register(hostname, runtime.GOOS, Version)
+		go s.RunHeartbeat()
+
 		// Report self-integrity to platform.
 		severity := "info"
 		eventType := "agent.startup"
@@ -138,6 +144,7 @@ func main() {
 				"agent_version": Version,
 				"integrity_ok":  intact,
 				"binary_hash":   currentHash,
+				"machine_id":    cfg.MachineID,
 			},
 		})
 

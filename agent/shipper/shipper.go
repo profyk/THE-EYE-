@@ -19,14 +19,27 @@ import (
 )
 
 const (
-	batchSize    = 100
-	minRetryWait = 2 * time.Second
-	maxRetryWait = 5 * time.Minute
-	shipInterval = 3 * time.Second
+	batchSize     = 100
+	minRetryWait  = 2 * time.Second
+	maxRetryWait  = 5 * time.Minute
+	shipInterval  = 3 * time.Second
+	heartbeatTick = 30 * time.Second
 )
 
 type batchPayload struct {
 	Events []*queue.Event `json:"events"`
+}
+
+type registerPayload struct {
+	MachineID    string `json:"machine_id"`
+	Hostname     string `json:"hostname"`
+	OS           string `json:"os"`
+	AgentVersion string `json:"agent_version"`
+	AgentLabel   string `json:"agent_label"`
+}
+
+type heartbeatPayload struct {
+	MachineID string `json:"machine_id"`
 }
 
 // Shipper reads from the queue and ships batches to the backend.
@@ -81,7 +94,7 @@ func (s *Shipper) Run() {
 			sleep := wait + jitter(wait)
 			log.Printf("[shipper] error: %v — retry in %s", err, sleep)
 			time.Sleep(sleep)
-			wait = min(wait*2, maxRetryWait)
+			wait = minDuration(wait*2, maxRetryWait)
 		} else {
 			wait = minRetryWait
 		}
@@ -90,7 +103,7 @@ func (s *Shipper) Run() {
 
 // shipOne sends one batch. Returns nil if queue is empty, unconfigured, or batch succeeds.
 func (s *Shipper) shipOne() error {
-	if s.cfg.ServerURL == "" {
+	if s.cfg.ServerURL == "" || s.cfg.TenantID == "" {
 		return nil // not configured yet
 	}
 	events, paths, err := s.q.ReadBatch(batchSize)
@@ -106,13 +119,14 @@ func (s *Shipper) shipOne() error {
 		return fmt.Errorf("marshal: %w", err)
 	}
 
-	url := s.cfg.ServerURL + "/v1/events/batch"
+	url := s.cfg.ServerURL + "/v1/agent/events"
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+s.cfg.APIKey)
+	req.Header.Set("X-Api-Key", s.cfg.APIKey)
+	req.Header.Set("X-Tenant-ID", s.cfg.TenantID)
 
 	resp, err := s.client.Do(req)
 	if err != nil {
@@ -124,7 +138,7 @@ func (s *Shipper) shipOne() error {
 		return fmt.Errorf("server error %d", resp.StatusCode)
 	}
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
-		return fmt.Errorf("auth rejected (%d) — check API key", resp.StatusCode)
+		return fmt.Errorf("auth rejected (%d) — check API key and Tenant ID", resp.StatusCode)
 	}
 	if resp.StatusCode >= 400 {
 		// Client error (e.g. 422 validation) — events are unshippable, drop them.
@@ -138,6 +152,71 @@ func (s *Shipper) shipOne() error {
 	return nil
 }
 
+// Register announces this machine to the backend once on startup.
+// Best-effort — the agent continues even if this fails (network may not be ready).
+func (s *Shipper) Register(hostname, osName, version string) {
+	if s.cfg.ServerURL == "" || s.cfg.TenantID == "" {
+		return
+	}
+	payload := registerPayload{
+		MachineID:    s.cfg.MachineID,
+		Hostname:     hostname,
+		OS:           osName,
+		AgentVersion: version,
+		AgentLabel:   s.cfg.AgentID,
+	}
+	body, _ := json.Marshal(payload)
+	url := s.cfg.ServerURL + "/v1/agent/register"
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		log.Printf("[shipper] register build request: %v", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Api-Key", s.cfg.APIKey)
+	req.Header.Set("X-Tenant-ID", s.cfg.TenantID)
+	resp, err := s.client.Do(req)
+	if err != nil {
+		log.Printf("[shipper] register: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	log.Printf("[shipper] registered machine %s (HTTP %d)", s.cfg.MachineID, resp.StatusCode)
+}
+
+// RunHeartbeat sends a heartbeat every 30 seconds so the portal can show this
+// machine as online. Runs until the process exits; call as go s.RunHeartbeat().
+func (s *Shipper) RunHeartbeat() {
+	if s.cfg.ServerURL == "" || s.cfg.TenantID == "" {
+		return
+	}
+	// Send immediately on start, then tick every heartbeatTick.
+	s.sendHeartbeat()
+	ticker := time.NewTicker(heartbeatTick)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.sendHeartbeat()
+	}
+}
+
+func (s *Shipper) sendHeartbeat() {
+	body, _ := json.Marshal(heartbeatPayload{MachineID: s.cfg.MachineID})
+	url := s.cfg.ServerURL + "/v1/agent/heartbeat"
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Api-Key", s.cfg.APIKey)
+	req.Header.Set("X-Tenant-ID", s.cfg.TenantID)
+	resp, err := s.client.Do(req)
+	if err != nil {
+		log.Printf("[heartbeat] %v", err)
+		return
+	}
+	resp.Body.Close()
+}
+
 // Stats returns telemetry for the tray tooltip.
 func (s *Shipper) Stats() (sent int64, errs int64, lastErr string) {
 	sent = s.sent.Load()
@@ -148,7 +227,7 @@ func (s *Shipper) Stats() (sent int64, errs int64, lastErr string) {
 	return
 }
 
-func min(a, b time.Duration) time.Duration {
+func minDuration(a, b time.Duration) time.Duration {
 	if a < b {
 		return a
 	}

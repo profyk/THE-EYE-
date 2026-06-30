@@ -1,3 +1,4 @@
+from app.models.agent_machine import AgentMachine  # noqa
 from app.models.alert_acknowledgment import AlertAcknowledgment
 from app.models.api_key import ApiKey
 from app.models.chain_head import ChainHead
@@ -11,6 +12,7 @@ from app.models.tenant import Tenant
 from app.models.user import User
 
 __all__ = [
+    "AgentMachine",
     "AlertAcknowledgment",
     "ApiKey",
     "ChainHead",

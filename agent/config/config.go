@@ -29,6 +29,8 @@ type Config struct {
 	ServerURL string `json:"server_url"`
 	APIKey    string `json:"api_key"`
 	AgentID   string `json:"agent_id"`
+	TenantID  string `json:"tenant_id"`
+	MachineID string `json:"machine_id"` // stable UUID for this machine, auto-generated
 	DataDir   string `json:"-"`
 }
 
@@ -68,6 +70,11 @@ func Load() (*Config, error) {
 			return nil, fmt.Errorf("parse config: %w", err)
 		}
 		cfg.DataDir = dir
+		// Back-fill MachineID for configs created before this field existed.
+		if cfg.MachineID == "" {
+			cfg.MachineID = newUUID()
+			_ = save(&cfg)
+		}
 		return &cfg, nil
 	}
 
@@ -78,6 +85,9 @@ func Load() (*Config, error) {
 			return nil, fmt.Errorf("parse bootstrap config: %w", err)
 		}
 		cfg.DataDir = dir
+		if cfg.MachineID == "" {
+			cfg.MachineID = newUUID()
+		}
 		if err := save(&cfg); err != nil {
 			return nil, fmt.Errorf("seal config: %w", err)
 		}
@@ -111,19 +121,23 @@ func Setup() (*Config, error) {
 	fmt.Println("\n  ═══ THE EYE — Agent Setup ═══\n")
 	cfg := &Config{
 		ServerURL: prompt("Server URL (e.g. https://eye.company.com)", ""),
-		APIKey:    prompt("Source API key (eye_live_…)", ""),
-		AgentID:   prompt("Agent ID / hostname", hostname),
+		APIKey:    prompt("API key (eye_…  from the portal → Admin → API Keys)", ""),
+		TenantID:  prompt("Tenant ID (from the portal → Admin → API Keys)", ""),
+		AgentID:   prompt("Agent label / hostname", hostname),
 		DataDir:   dir,
 	}
 
-	if cfg.ServerURL == "" || cfg.APIKey == "" {
-		return nil, errors.New("server_url and api_key are required")
+	if cfg.ServerURL == "" || cfg.APIKey == "" || cfg.TenantID == "" {
+		return nil, errors.New("server_url, api_key, and tenant_id are required")
 	}
+
+	cfg.MachineID = newUUID()
 
 	if err := save(cfg); err != nil {
 		return nil, err
 	}
-	fmt.Println("\n  Config sealed with machine key. Agent is ready.\n")
+	fmt.Printf("\n  Machine ID : %s\n", cfg.MachineID)
+	fmt.Println("  Config sealed with machine key. Agent is ready.\n")
 	return cfg, nil
 }
 
@@ -150,6 +164,15 @@ func save(cfg *Config) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, "config.enc"), sealed, 0600)
+}
+
+// newUUID generates a random RFC 4122 v4 UUID string.
+func newUUID() string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant bits
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
 // machineKey derives a 256-bit key from the Windows MachineGuid via PBKDF2-SHA256.
