@@ -25,7 +25,7 @@ router = APIRouter(prefix="/v1/alerts", tags=["alerts"])
 PLATFORM_SOURCE_NAME = "the-eye-platform"
 
 
-@router.get("/rules", dependencies=[Depends(require_role("admin", "investigator", "platform_admin"))])
+@router.get("/rules", dependencies=[Depends(require_role("admin", "investigator", "super_admin"))])
 async def list_alert_rules() -> list[dict]:
     return [
         {
@@ -70,7 +70,7 @@ async def list_alert_rules() -> list[dict]:
     ]
 
 
-@router.get("", response_model=list[AlertRead], dependencies=[Depends(require_role("admin", "investigator", "platform_admin"))])
+@router.get("", response_model=list[AlertRead], dependencies=[Depends(require_role("admin", "investigator", "super_admin"))])
 async def list_alerts(
     db: AsyncSession = Depends(get_db), tenant_id: UUID = Depends(require_tenant_id)
 ) -> list[AlertRead]:
@@ -96,7 +96,7 @@ async def list_alerts(
 async def act_on_alert(
     alert_key: str,
     body: AlertActionRequest,
-    user: User = Depends(require_role("admin", "investigator", "platform_admin")),
+    user: User = Depends(require_role("admin", "investigator", "super_admin")),
     db: AsyncSession = Depends(get_db),
     tenant_id: UUID = Depends(require_tenant_id),
 ) -> dict:

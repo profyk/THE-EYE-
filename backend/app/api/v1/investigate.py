@@ -9,7 +9,7 @@ from app.schemas.investigate import InvestigateRequest, InvestigateResponse
 from app.services.event_search import search_events_raw
 from app.services.llm_service import LLMNotConfiguredError, extract_search_filters, generate_report
 
-router = APIRouter(prefix="/v1", tags=["investigate"], dependencies=[Depends(require_role("admin", "investigator", "platform_admin"))])
+router = APIRouter(prefix="/v1", tags=["investigate"], dependencies=[Depends(require_role("admin", "investigator", "super_admin"))])
 
 
 @router.post("/investigate", response_model=InvestigateResponse)

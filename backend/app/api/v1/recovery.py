@@ -78,15 +78,15 @@ async def recovery_reset_password(
     user = await get_user_by_username(db, data.username)
 
     if user is None:
-        if data.role == "platform_admin":
+        if data.role == "super_admin":
             user = await create_user(
                 db,
-                UserCreate(username=data.username, password=data.new_password, role="platform_admin"),
+                UserCreate(username=data.username, password=data.new_password, role="super_admin"),
             )
             return {
                 "ok": True,
                 "created": True,
-                "message": f"Created platform_admin '{user.username}'. Remove RECOVERY_TOKEN now.",
+                "message": f"Created super_admin '{user.username}'. Remove RECOVERY_TOKEN now.",
             }
 
         tenants = await list_tenants(db)

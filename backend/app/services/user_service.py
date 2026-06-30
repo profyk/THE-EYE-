@@ -18,12 +18,12 @@ from app.schemas.user import UserCreate
 
 
 async def create_user(db: AsyncSession, data: UserCreate) -> User:
-    # platform_admin is the only role allowed no tenant at all (see
-    # ck_users_tenant_required_unless_platform_admin); every other role falls
+    # super_admin is the only role allowed no tenant at all (see
+    # ck_users_tenant_required_unless_super_admin); every other role falls
     # back to the bootstrap tenant if the caller doesn't specify one, so
     # existing call sites that predate multi-tenancy keep working unchanged.
     tenant_id = data.tenant_id
-    if tenant_id is None and data.role != "platform_admin":
+    if tenant_id is None and data.role != "super_admin":
         tenant_id = DEFAULT_TENANT_ID
 
     password_hash, salt = hash_password(data.password)
@@ -155,7 +155,7 @@ async def deactivate_user(db: AsyncSession, user_id: UUID, *, tenant_id: UUID) -
 
 
 async def list_users(db: AsyncSession, *, tenant_id: UUID | None) -> list[User]:
-    """tenant_id=None means "don't scope" -- only valid for a platform_admin
+    """tenant_id=None means "don't scope" -- only valid for a super_admin
     caller (the router enforces that), everyone else always passes their own
     tenant_id."""
     stmt = select(User).order_by(User.created_at.desc())

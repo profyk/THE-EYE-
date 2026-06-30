@@ -7,7 +7,7 @@ from app.api.deps import get_db, require_role, require_tenant_id
 from app.schemas.intrusion import IntrusionStats
 from app.services.intrusion_service import get_intrusion_stats
 
-router = APIRouter(prefix="/v1/intrusion", tags=["intrusion"], dependencies=[Depends(require_role("admin", "investigator", "platform_admin"))])
+router = APIRouter(prefix="/v1/intrusion", tags=["intrusion"], dependencies=[Depends(require_role("admin", "investigator", "super_admin"))])
 
 
 @router.get("/stats", response_model=IntrusionStats)

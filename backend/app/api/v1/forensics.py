@@ -7,7 +7,7 @@ from app.api.deps import get_db, require_role, require_tenant_id
 from app.ledger.verify import verify_chain
 from app.services.network_service import get_actor_target_network
 
-router = APIRouter(prefix="/v1", tags=["forensics"], dependencies=[Depends(require_role("admin", "investigator", "platform_admin"))])
+router = APIRouter(prefix="/v1", tags=["forensics"], dependencies=[Depends(require_role("admin", "investigator", "super_admin"))])
 
 
 @router.get("/chain/verify")

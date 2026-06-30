@@ -64,7 +64,7 @@ async def touch_last_seen(db: AsyncSession, source_id) -> None:
 
 
 async def list_sources(db: AsyncSession, *, tenant_id: UUID | None) -> list[IngestionSource]:
-    """tenant_id=None means "don't scope" -- only valid for a platform_admin
+    """tenant_id=None means "don't scope" -- only valid for a super_admin
     caller, everyone else always passes their own tenant_id."""
     stmt = select(IngestionSource).order_by(IngestionSource.created_at.desc())
     if tenant_id is not None:

@@ -114,7 +114,7 @@ export default function Sidebar(): React.ReactElement {
       <div className="px-4 py-4 border-t border-border">
         <p className="text-[10px] text-muted uppercase tracking-wider mb-0.5">Signed in as</p>
         <p className="text-sm font-semibold text-text truncate">{session?.username ?? "—"}</p>
-        <p className="text-[10px] text-accent uppercase tracking-wider mb-3">Platform Admin</p>
+        <p className="text-[10px] text-accent uppercase tracking-wider mb-3">Super Admin</p>
         <button
           onClick={handleSignOut}
           className="w-full text-xs text-muted hover:text-danger transition-colors py-1.5 px-2 rounded-lg hover:bg-danger/10 text-left"

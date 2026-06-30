@@ -25,5 +25,5 @@ export function clearSession(): void {
 
 export function isLoggedIn(): boolean {
   const s = getSession();
-  return s !== null && s.role === "platform_admin";
+  return s !== null && s.role === "super_admin";
 }

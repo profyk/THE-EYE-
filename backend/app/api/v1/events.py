@@ -67,7 +67,7 @@ def _json_default(value):
     return str(value)
 
 
-@router.get("/events/export", dependencies=[Depends(require_role("admin", "investigator", "platform_admin"))])
+@router.get("/events/export", dependencies=[Depends(require_role("admin", "investigator", "super_admin"))])
 async def export_events(
     actor_id: str | None = None,
     event_type: str | None = None,
@@ -119,7 +119,7 @@ async def export_events(
 @router.get(
     "/events/{event_id}",
     response_model=EventRead,
-    dependencies=[Depends(require_role("admin", "investigator", "platform_admin"))],
+    dependencies=[Depends(require_role("admin", "investigator", "super_admin"))],
 )
 async def get_event(
     event_id: UUID,
@@ -142,7 +142,7 @@ async def get_event(
 @router.get(
     "/events",
     response_model=list[EventRead],
-    dependencies=[Depends(require_role("admin", "investigator", "platform_admin"))],
+    dependencies=[Depends(require_role("admin", "investigator", "super_admin"))],
 )
 async def search_events(
     actor_id: str | None = None,

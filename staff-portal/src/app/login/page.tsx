@@ -22,7 +22,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const session = await loginRequest(username, password);
-      if (session.role !== "platform_admin") {
+      if (session.role !== "super_admin") {
         setError("Access denied — staff credentials required.");
         setLoading(false);
         return;

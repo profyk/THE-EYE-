@@ -13,7 +13,7 @@ from app.services.stats_service import (
     get_overview_stats,
 )
 
-router = APIRouter(prefix="/v1", tags=["stats"], dependencies=[Depends(require_role("admin", "investigator", "platform_admin"))])
+router = APIRouter(prefix="/v1", tags=["stats"], dependencies=[Depends(require_role("admin", "investigator", "super_admin"))])
 
 
 @router.get("/stats/overview", response_model=OverviewStats)

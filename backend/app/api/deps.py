@@ -111,19 +111,19 @@ def require_role(*allowed_roles: str):
 
 async def resolve_tenant_id(
     tenant_id: UUID | None = Query(
-        default=None, description="Which tenant to view -- only meaningful for platform_admin"
+        default=None, description="Which tenant to view -- only meaningful for super_admin"
     ),
     user: User = Depends(get_current_user),
 ) -> UUID | None:
     """Every regular (tenant-scoped) user always gets their own tenant_id --
     the query param is silently ignored for them, so there's no way to use it
-    to peek at another tenant's data. platform_admin has no tenant_id of
+    to peek at another tenant's data. super_admin has no tenant_id of
     their own, so they must supply ?tenant_id= to pick one; returning None
     here means "no tenant selected", which callers that allow a genuine
     cross-tenant list (e.g. listing all tenants' users) can treat as
     "don't filter". Callers that always need exactly one tenant should use
     require_tenant_id instead."""
-    if user.role == "platform_admin":
+    if user.role == "super_admin":
         return tenant_id
     return user.tenant_id
 
@@ -132,9 +132,9 @@ async def require_tenant_id(
     tenant_id: UUID | None = Depends(resolve_tenant_id),
 ) -> UUID:
     """Use in routes where an unscoped, all-tenants-merged view never makes
-    sense (events, stats, alerts, intrusion, network) -- forces platform_admin
+    sense (events, stats, alerts, intrusion, network) -- forces super_admin
     to pick one tenant via ?tenant_id=, with a clear 400 instead of silently
     returning an empty or mixed result."""
     if tenant_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "tenant_id query parameter is required for platform_admin")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "tenant_id query parameter is required for super_admin")
     return tenant_id

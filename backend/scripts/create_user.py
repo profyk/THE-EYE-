@@ -2,7 +2,7 @@
 
 Usage:
     python -m scripts.create_user --username admin --role admin --tenant-slug acme
-    python -m scripts.create_user --username platform-admin --role platform_admin
+    python -m scripts.create_user --username platform-admin --role super_admin
     (prompts for a password; or pass --password to script it non-interactively)
 """
 import argparse
@@ -29,8 +29,8 @@ async def main(username: str, password: str, role: str, tenant_slug: str | None)
                 print(f"No tenant with slug '{tenant_slug}' -- create it first with scripts.create_tenant.")
                 return
             tenant_id = tenant.id
-        elif role != "platform_admin":
-            print("--tenant-slug is required for every role except platform_admin.")
+        elif role != "super_admin":
+            print("--tenant-slug is required for every role except super_admin.")
             return
 
         user = await create_user(db, UserCreate(username=username, password=password, role=role, tenant_id=tenant_id))
@@ -51,10 +51,10 @@ if __name__ == "__main__":
             "compliance_officer",
             "security_officer",
             "executive_authority",
-            "platform_admin",
+            "super_admin",
         ],
     )
-    parser.add_argument("--tenant-slug", default=None, help="Required for every role except platform_admin")
+    parser.add_argument("--tenant-slug", default=None, help="Required for every role except super_admin")
     parser.add_argument("--password", default=None, help="If omitted, you'll be prompted (not echoed)")
     args = parser.parse_args()
 

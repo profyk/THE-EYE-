@@ -30,7 +30,7 @@ def build_event_search_stmt(
 
     stmt = select(LedgerEvent).order_by(LedgerEvent.sequence_num.desc())
 
-    # tenant_id=None is only valid for a platform_admin caller viewing across
+    # tenant_id=None is only valid for a super_admin caller viewing across
     # all tenants -- every other caller always passes their own tenant_id, so
     # this is the one filter that's never optional for a real business user.
     if tenant_id is not None:

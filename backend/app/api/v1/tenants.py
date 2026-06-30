@@ -5,11 +5,11 @@ from app.api.deps import get_db, require_role
 from app.schemas.tenant import TenantCreate, TenantRead
 from app.services.tenant_service import create_tenant, get_tenant_by_slug, list_tenants
 
-# platform_admin only -- this is THE EYE's own staff managing customer
+# super_admin only -- this is THE EYE's own staff managing customer
 # tenants, not anything a business owner ever sees. No frontend panel for
-# this yet (a later phase); for now platform_admin uses this API directly or
+# this yet (a later phase); for now super_admin uses this API directly or
 # scripts/create_tenant.py.
-router = APIRouter(prefix="/v1/tenants", tags=["tenants"], dependencies=[Depends(require_role("platform_admin"))])
+router = APIRouter(prefix="/v1/tenants", tags=["tenants"], dependencies=[Depends(require_role("super_admin"))])
 
 
 @router.post("", response_model=TenantRead, status_code=status.HTTP_201_CREATED)

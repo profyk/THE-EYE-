@@ -13,12 +13,12 @@ ROLES = (
     "compliance_officer",
     "security_officer",
     "executive_authority",
-    "platform_admin",
+    "super_admin",
 )
 
-# platform_admin is THE EYE's own staff -- cross-tenant, no tenant_id of their
+# super_admin is THE EYE's own staff -- cross-tenant, no tenant_id of their
 # own. Every other role belongs to exactly one tenant.
-TENANTLESS_ROLES = ("platform_admin",)
+TENANTLESS_ROLES = ("super_admin",)
 
 # Roles 2-5 above are the four approver roles used only by the multi-signature
 # deletion-approval gate -- they don't grant any other access beyond that.

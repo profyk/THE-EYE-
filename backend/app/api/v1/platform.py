@@ -6,7 +6,7 @@ from app.config import settings
 router = APIRouter(
     prefix="/v1/platform",
     tags=["platform"],
-    dependencies=[Depends(require_role("admin", "investigator", "platform_admin"))],
+    dependencies=[Depends(require_role("admin", "investigator", "super_admin"))],
 )
 
 

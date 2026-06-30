@@ -14,7 +14,7 @@ from app.models.user import User
 router = APIRouter(
     prefix="/v1/staff",
     tags=["staff"],
-    dependencies=[Depends(require_role("platform_admin"))],
+    dependencies=[Depends(require_role("super_admin"))],
 )
 
 
@@ -91,7 +91,7 @@ async def get_overview(db: AsyncSession = Depends(get_db)) -> PlatformOverview:
         select(func.count()).select_from(Tenant).where(Tenant.is_active == True)  # noqa: E712
     )).scalar_one()
     total_users = (await db.execute(
-        select(func.count()).select_from(User).where(User.role != "platform_admin")
+        select(func.count()).select_from(User).where(User.role != "super_admin")
     )).scalar_one()
     total_events_30d = (await db.execute(
         select(func.count()).select_from(LedgerEvent).where(LedgerEvent.occurred_at >= cutoff)
@@ -148,7 +148,7 @@ async def activate_tenant(tenant_id: UUID, db: AsyncSession = Depends(get_db)) -
 @router.get("/users", response_model=list[UserWithTenant])
 async def list_all_users(db: AsyncSession = Depends(get_db)) -> list[UserWithTenant]:
     users = list((await db.execute(
-        select(User).where(User.role != "platform_admin").order_by(User.created_at.desc())
+        select(User).where(User.role != "super_admin").order_by(User.created_at.desc())
     )).scalars().all())
     tenant_ids = list({u.tenant_id for u in users if u.tenant_id is not None})
     tenant_names: dict[UUID, str] = {}

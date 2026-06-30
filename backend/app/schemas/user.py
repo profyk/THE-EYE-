@@ -11,7 +11,7 @@ Role = Literal[
     "compliance_officer",
     "security_officer",
     "executive_authority",
-    "platform_admin",
+    "super_admin",
 ]
 
 
@@ -19,7 +19,7 @@ class UserCreate(BaseModel):
     username: str = Field(min_length=1, max_length=64)
     password: str = Field(min_length=8, max_length=256)
     role: Role
-    # Optional: defaults to the bootstrap tenant for any non-platform_admin
+    # Optional: defaults to the bootstrap tenant for any non-super_admin
     # role (see user_service.create_user) so existing call sites that don't
     # pass this keep working unchanged.
     tenant_id: UUID | None = None
