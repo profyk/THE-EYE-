@@ -16,6 +16,7 @@ from app.api.v1 import (
     recovery,
     signup,
     sources,
+    staff,
     stats,
     tenants,
     users,
@@ -125,6 +126,7 @@ app.include_router(investigate.router)
 app.include_router(whistleblower.router)
 app.include_router(intrusion.router)
 app.include_router(tenants.router)
+app.include_router(staff.router)
 app.include_router(platform.router)
 
 
