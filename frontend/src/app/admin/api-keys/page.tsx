@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import NavBar from "@/components/NavBar";
 import Panel from "@/components/Panel";
 import { useRequireAuth } from "@/lib/useRequireAuth";
@@ -10,8 +11,10 @@ import {
   createApiKey,
   updateApiKey,
   revokeApiKey,
+  getTenantSubscription,
   ApiKeyOut,
   ApiKeyCreated,
+  SubscriptionOut,
   ApiError,
 } from "@/lib/api-client";
 
@@ -242,10 +245,12 @@ THE_EYE_API_URL=${apiUrl}`}
 
 export default function ApiKeysPage() {
   const ready = useRequireAuth();
+  const router = useRouter();
   const session = getSession();
   const tenantId = session?.tenant_id ?? "";
 
   const [keys, setKeys] = useState<ApiKeyOut[]>([]);
+  const [sub, setSub] = useState<SubscriptionOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
@@ -255,7 +260,9 @@ export default function ApiKeysPage() {
 
   const load = useCallback(async () => {
     try {
-      setKeys(await listApiKeys());
+      const [keysData, subData] = await Promise.all([listApiKeys(), getTenantSubscription()]);
+      setKeys(keysData);
+      setSub(subData);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load API keys.");
     } finally {
@@ -300,6 +307,13 @@ export default function ApiKeysPage() {
 
   if (!ready) return null;
 
+  // Plan-aware key limit: null means unlimited
+  const planKeyLimit: number | null = sub?.plan?.limits?.api_keys ?? 20;
+  const atLimit = planKeyLimit !== null && keys.length >= planKeyLimit;
+  const limitDisplay = planKeyLimit === null ? "∞" : planKeyLimit;
+
+  const subStatus = sub?.paddle_subscription_status;
+
   return (
     <NavBar>
       {showNew && (
@@ -313,7 +327,7 @@ export default function ApiKeysPage() {
         />
       )}
 
-      <div className="p-8 max-w-4xl space-y-8">
+      <div className="p-8 max-w-4xl space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -322,16 +336,95 @@ export default function ApiKeysPage() {
               Generate keys for THE EYE Agent to authenticate from your machines.
             </p>
           </div>
-          <button
-            onClick={() => setShowNew(true)}
-            className="shrink-0 flex items-center gap-2 bg-accent hover:bg-accent/90 text-void font-semibold px-4 py-2 rounded-lg text-sm transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Generate Key
-          </button>
+          {atLimit ? (
+            <button
+              onClick={() => router.push("/billing")}
+              className="shrink-0 flex items-center gap-2 bg-surface hover:bg-accent/10 border border-accent/30 text-accent font-semibold px-4 py-2 rounded-lg text-sm transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+              Upgrade for more keys
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowNew(true)}
+              className="shrink-0 flex items-center gap-2 bg-accent hover:bg-accent/90 text-void font-semibold px-4 py-2 rounded-lg text-sm transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Generate Key
+            </button>
+          )}
         </div>
+
+        {/* Plan status banner */}
+        <div className={`flex items-center gap-4 rounded-xl border px-5 py-4 ${
+          sub?.plan
+            ? subStatus === "active"
+              ? "bg-safe/5 border-safe/20"
+              : subStatus === "past_due"
+              ? "bg-warn/5 border-warn/20"
+              : "bg-surface border-border"
+            : "bg-accent/5 border-accent/20"
+        }`}>
+          <div className="w-9 h-9 rounded-lg bg-panel border border-border flex items-center justify-center shrink-0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            {sub?.plan ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-text">{sub.plan.name} Plan</p>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                    subStatus === "active" ? "text-safe bg-safe/10 border-safe/20" :
+                    subStatus === "past_due" ? "text-warn bg-warn/10 border-warn/20" :
+                    "text-muted bg-surface border-border"
+                  }`}>
+                    {subStatus ?? "trial"}
+                  </span>
+                </div>
+                <p className="text-xs text-muted mt-0.5">
+                  {planKeyLimit !== null
+                    ? `${keys.length} of ${planKeyLimit} API keys used`
+                    : "Unlimited API keys"}
+                  {sub.plan.limits?.users != null ? ` · Up to ${sub.plan.limits.users} users` : ""}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-text">No active plan</p>
+                <p className="text-xs text-muted mt-0.5">Subscribe to unlock full access and remove limits.</p>
+              </>
+            )}
+          </div>
+          <a
+            href="/billing"
+            className="shrink-0 flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg bg-accent hover:bg-accent/90 text-void transition-colors"
+          >
+            {sub?.plan ? "Manage Plan" : "Subscribe"}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </a>
+        </div>
+
+        {/* Past-due warning */}
+        {subStatus === "past_due" && (
+          <div className="flex items-center gap-3 bg-danger/5 border border-danger/20 rounded-xl px-4 py-3">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-danger shrink-0">
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <p className="text-sm text-danger">
+              Your payment is past due. API key access may be restricted soon.{" "}
+              <a href="/billing" className="underline font-semibold">Update payment →</a>
+            </p>
+          </div>
+        )}
 
         {/* Tenant ID banner */}
         {tenantId && (
@@ -389,7 +482,7 @@ export default function ApiKeysPage() {
         <Panel>
           <div className="px-6 py-4 border-b border-border flex items-center justify-between">
             <p className="text-sm font-semibold text-text">API Keys</p>
-            <p className="text-xs text-muted">{keys.length} / 20</p>
+            <p className="text-xs text-muted">{keys.length} / {limitDisplay}</p>
           </div>
 
           {loading ? (

@@ -165,6 +165,7 @@ export default function BillingPage() {
 
   const statusKey = sub?.paddle_subscription_status ?? "trial";
   const statusCls = STATUS_COLOR[statusKey] ?? "text-[var(--muted)] bg-[var(--surface)] border-[var(--border)]";
+  const limits = sub?.plan?.limits;
 
   return (
     <div className="p-8 max-w-5xl space-y-8">
@@ -173,25 +174,61 @@ export default function BillingPage() {
         <p className="text-sm text-[var(--muted)] mt-1">Manage your plan and payment details.</p>
       </div>
 
+      {/* Current plan card */}
       {sub && (
-        <div className="bg-[var(--panel)] border border-[var(--border)] rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex-1">
-            <p className="text-xs text-[var(--muted)] uppercase tracking-wider mb-1">Current Plan</p>
-            <p className="text-xl font-bold text-[var(--text)]">{sub.plan?.name ?? "No plan"}</p>
-            {sub.plan?.description && (
-              <p className="text-sm text-[var(--muted)] mt-0.5">{sub.plan.description}</p>
-            )}
+        <div className="bg-[var(--panel)] border border-[var(--border)] rounded-2xl p-6">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+            <div className="flex-1">
+              <p className="text-xs text-[var(--muted)] uppercase tracking-wider mb-1">Current Plan</p>
+              <p className="text-xl font-bold text-[var(--text)]">{sub.plan?.name ?? "No plan"}</p>
+              {sub.plan?.description && (
+                <p className="text-sm text-[var(--muted)] mt-0.5">{sub.plan.description}</p>
+              )}
+            </div>
+            <div className="flex flex-col items-start sm:items-end gap-2 shrink-0">
+              <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${statusCls}`}>
+                {statusKey}
+              </span>
+              {sub.paddle_subscription_id && (
+                <p className="text-[10px] font-mono text-[var(--muted)]">
+                  Sub: {sub.paddle_subscription_id}
+                </p>
+              )}
+            </div>
           </div>
-          <div className="flex flex-col items-start sm:items-end gap-2">
-            <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${statusCls}`}>
-              {statusKey}
-            </span>
-            {sub.paddle_subscription_id && (
-              <p className="text-[10px] font-mono text-[var(--muted)]">
-                Sub: {sub.paddle_subscription_id}
-              </p>
-            )}
-          </div>
+
+          {/* Plan limits grid */}
+          {limits && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-5 border-t border-[var(--border)]">
+              {[
+                {
+                  label: "Users",
+                  value: limits.users != null ? String(limits.users) : "∞",
+                },
+                {
+                  label: "API Keys",
+                  value: limits.api_keys != null ? String(limits.api_keys) : "∞",
+                },
+                {
+                  label: "Events/mo",
+                  value: limits.events_per_month != null
+                    ? (limits.events_per_month / 1000).toFixed(0) + "k"
+                    : "∞",
+                },
+                {
+                  label: "Retention",
+                  value: limits.retention_days != null
+                    ? limits.retention_days + " days"
+                    : "Custom",
+                },
+              ].map((item) => (
+                <div key={item.label} className="text-center bg-[var(--surface)] rounded-xl py-3 px-2">
+                  <p className="text-lg font-bold font-mono text-[var(--text)]">{item.value}</p>
+                  <p className="text-[10px] text-[var(--muted)] uppercase tracking-wider mt-0.5">{item.label}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
