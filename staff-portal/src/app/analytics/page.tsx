@@ -7,8 +7,8 @@ import StatCard from "@/components/StatCard";
 import Badge from "@/components/Badge";
 import { getPlatformAnalytics, PlatformAnalytics, ApiError } from "@/lib/api-client";
 
-const SEVERITY_VARIANT: Record<string, "danger" | "warn" | "active" | "neutral"> = {
-  critical: "danger",
+const SEVERITY_VARIANT: Record<string, "suspended" | "warn" | "active" | "neutral"> = {
+  critical: "suspended",
   high:     "warn",
   medium:   "active",
   low:      "neutral",
