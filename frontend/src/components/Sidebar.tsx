@@ -3,7 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { clearSession, getSession } from "@/lib/auth";
 import { logout } from "@/lib/api-client";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -98,7 +98,6 @@ function NavGroup({ label, items }: { label: string; items: { href: string; labe
 }
 
 export default function Sidebar() {
-  const router   = useRouter();
   const session  = getSession();
 
   const canSeeDeletion   = session?.role && APPROVER_ROLES.includes(session.role);
@@ -117,10 +116,9 @@ export default function Sidebar() {
   ];
 
   async function handleLogout() {
-    try { await logout(); } finally {
-      clearSession();
-      router.replace("/login");
-    }
+    try { await logout(); } catch { /* ignore — session expires server-side */ }
+    clearSession();
+    window.location.replace("/login");
   }
 
   return (

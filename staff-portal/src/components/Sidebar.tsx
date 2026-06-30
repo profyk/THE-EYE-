@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { getSession, clearSession } from "@/lib/auth";
 import { logout } from "@/lib/api-client";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -66,13 +66,12 @@ const GROUPS: NavGroup[] = [
 
 export default function Sidebar(): React.ReactElement {
   const pathname = usePathname();
-  const router = useRouter();
   const session = getSession();
 
   async function handleSignOut() {
-    try { await logout(); } catch { /* ignore */ }
+    try { await logout(); } catch { /* ignore — session expires server-side */ }
     clearSession();
-    router.replace("/login");
+    window.location.replace("/login");
   }
 
   return (

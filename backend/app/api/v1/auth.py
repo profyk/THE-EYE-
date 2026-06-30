@@ -132,6 +132,7 @@ async def logout(request: Request, response: Response, db: AsyncSession = Depend
     response.delete_cookie(
         SESSION_COOKIE_NAME,
         path="/",
+        httponly=True,
         secure=settings.cookie_secure,
         samesite=settings.cookie_samesite,
     )
