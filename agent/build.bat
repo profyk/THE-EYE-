@@ -11,13 +11,13 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [THE EYE] Building agent...
+echo [THE EYE] Building agent for Windows (amd64)...
 set CGO_ENABLED=0
 set GOOS=windows
 set GOARCH=amd64
 
 go build ^
-  -ldflags="-H windowsgui -s -w -X main.Version=1.0.0" ^
+  -ldflags="-H windowsgui -s -w -X main.Version=1.1.0" ^
   -trimpath ^
   -o eye-agent.exe ^
   .

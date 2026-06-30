@@ -49,13 +49,24 @@
   --color-muted: var(--muted);
 }
 
+/* Safe-area CSS custom properties for notched/Dynamic Island iPhones. */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
 body {
   background: var(--void);
   color: var(--text);
   font-family: system-ui, -apple-system, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 * {
+  -webkit-tap-highlight-color: transparent;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }

@@ -59,10 +59,27 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Safe-area CSS custom properties for notched/Dynamic Island iPhones.
+   Components that need to clear the notch can use var(--sat), var(--sab) etc. */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
 body {
   background: var(--void);
   color: var(--text);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  /* Prevent iOS from inflating font sizes in landscape */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Remove blue tap-flash on touch devices */
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
 @keyframes fade-in {

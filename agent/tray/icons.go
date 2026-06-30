@@ -19,31 +19,45 @@ var appIconPNG []byte
 
 const iconSize = 32
 
-// Scaled-down versions of the app icon, initialised once at startup.
+// Scaled-down icon bytes, initialised once at startup.
+// Windows tray needs ICO-wrapped bytes; macOS/Linux accept raw PNG.
+// EyeOpenICO / EyeClosedICO are defined in platform-specific files.
 var (
 	icoOpen   []byte
 	icoClosed []byte
+	pngOpen   []byte
+	pngClosed []byte
 )
 
 func init() {
 	src, _, err := image.Decode(bytes.NewReader(appIconPNG))
 	if err != nil {
 		// Fall back to the programmatic eye if the embedded PNG can't be decoded.
-		icoOpen = makeICO(drawEyeOpen())
-		icoClosed = makeICO(drawEyeClosed())
+		open := drawEyeOpen()
+		closed := drawEyeClosed()
+		icoOpen = makeICO(open)
+		icoClosed = makeICO(closed)
+		var b bytes.Buffer
+		_ = png.Encode(&b, open)
+		pngOpen = b.Bytes()
+		b.Reset()
+		_ = png.Encode(&b, closed)
+		pngClosed = b.Bytes()
 		return
 	}
 	full := boxScale(src, iconSize, iconSize)
 	dim := dimImage(full, 0.35)
+
+	var b bytes.Buffer
+	_ = png.Encode(&b, full)
+	pngOpen = b.Bytes()
+	b.Reset()
+	_ = png.Encode(&b, dim)
+	pngClosed = b.Bytes()
+
 	icoOpen = makeICO(full)
 	icoClosed = makeICO(dim)
 }
-
-// EyeOpenICO returns the full-colour app icon at tray size.
-func EyeOpenICO() []byte { return icoOpen }
-
-// EyeClosedICO returns a dimmed version of the app icon for the blink frame.
-func EyeClosedICO() []byte { return icoClosed }
 
 // ── Image processing ──────────────────────────────────────────────────────────
 
