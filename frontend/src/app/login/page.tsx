@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { login as loginRequest, ApiError } from "@/lib/api-client";
+import { login as loginRequest, ApiError, API_BASE } from "@/lib/api-client";
 import { isLoggedIn, setSession } from "@/lib/auth";
 import Panel from "@/components/Panel";
 import Button from "@/components/Button";
@@ -37,7 +37,7 @@ export default function LoginPage() {
       } else if (err instanceof ApiError) {
         setError(`Server error (${err.status}) — check Railway logs.`);
       } else {
-        setError("Could not reach the server — check your internet connection.");
+        setError(`Could not reach the server (${API_BASE}) — check Vercel env NEXT_PUBLIC_API_BASE_URL.`);
       }
     } finally {
       setLoading(false);
