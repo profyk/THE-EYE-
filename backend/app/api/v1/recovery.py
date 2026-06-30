@@ -16,7 +16,7 @@ import secrets
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select, text, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
@@ -142,8 +142,6 @@ async def promote_super_admin(
     # Just flip the role — tenant_id stays set so the existing constraint
     # (tenant_id IS NOT NULL OR role = ...) keeps passing. The staff portal
     # gates on role only; having a tenant_id on a super_admin is harmless.
-    await db.execute(
-        update(User).where(User.username == data.username).values(role="super_admin")
-    )
+    user.role = "super_admin"
     await db.commit()
     return {"ok": True, "message": f"'{data.username}' is now super_admin. Remove RECOVERY_TOKEN now."}
