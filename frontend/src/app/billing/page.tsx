@@ -138,10 +138,31 @@ export default function BillingPage() {
   const [message, setMessage] = useState<{ text: string; type: "info" | "error" } | null>(null);
 
   useEffect(() => {
-    Promise.all([getPublicPlans(), getTenantSubscription()])
-      .then(([p, s]) => { setPlans(p); setSub(s); })
-      .catch((e) => setMessage({ text: e instanceof ApiError ? e.message : "Failed to load billing.", type: "error" }))
-      .finally(() => setLoading(false));
+    async function load() {
+      // Fetch plans and subscription independently so one failure doesn't hide the other.
+      try {
+        setPlans(await getPublicPlans());
+      } catch (e) {
+        setMessage({
+          text: `Plans: ${e instanceof ApiError ? `${e.status} — ${e.message}` : String(e)}`,
+          type: "error",
+        });
+      }
+      try {
+        setSub(await getTenantSubscription());
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) {
+          // Not logged in — plans still show, subscription silently absent.
+        } else {
+          setMessage({
+            text: `Subscription: ${e instanceof ApiError ? `${e.status} — ${e.message}` : String(e)}`,
+            type: "error",
+          });
+        }
+      }
+      setLoading(false);
+    }
+    load();
   }, []);
 
   async function handleSubscribe(plan: Plan, cycle: "monthly" | "annual") {
