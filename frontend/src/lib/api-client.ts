@@ -98,6 +98,17 @@ export async function deactivateUser(id: string): Promise<UserRead> {
   return request<UserRead>(`/v1/users/${id}/deactivate`, { method: "POST" });
 }
 
+export async function reactivateUser(id: string): Promise<UserRead> {
+  return request<UserRead>(`/v1/users/${id}/reactivate`, { method: "POST" });
+}
+
+export async function changeUserRole(id: string, role: string): Promise<UserRead> {
+  return request<UserRead>(`/v1/users/${id}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+
 export async function resetUserPassword(id: string, newPassword: string): Promise<UserRead> {
   return request<UserRead>(`/v1/users/${id}/reset-password`, {
     method: "POST",

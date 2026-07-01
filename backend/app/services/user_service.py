@@ -154,6 +154,45 @@ async def deactivate_user(db: AsyncSession, user_id: UUID, *, tenant_id: UUID) -
     return user
 
 
+async def reactivate_user(db: AsyncSession, user_id: UUID, *, tenant_id: UUID) -> User | None:
+    user = (
+        await db.execute(select(User).where(User.id == user_id, User.tenant_id == tenant_id))
+    ).scalar_one_or_none()
+    if user is None:
+        return None
+    user.is_active = True
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+async def change_role(db: AsyncSession, user_id: UUID, new_role: str, *, tenant_id: UUID) -> User | None:
+    user = (
+        await db.execute(select(User).where(User.id == user_id, User.tenant_id == tenant_id))
+    ).scalar_one_or_none()
+    if user is None:
+        return None
+    user.role = new_role
+    # Revoke sessions so the new role takes effect on next login immediately.
+    await _revoke_all_sessions(db, user_id)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+async def count_active_admins(db: AsyncSession, *, tenant_id: UUID) -> int:
+    from sqlalchemy import func
+    return (
+        await db.execute(
+            select(func.count()).select_from(User).where(
+                User.tenant_id == tenant_id,
+                User.role == "admin",
+                User.is_active.is_(True),
+            )
+        )
+    ).scalar_one()
+
+
 async def list_users(db: AsyncSession, *, tenant_id: UUID | None) -> list[User]:
     """tenant_id=None means "don't scope" -- only valid for a super_admin
     caller (the router enforces that), everyone else always passes their own
