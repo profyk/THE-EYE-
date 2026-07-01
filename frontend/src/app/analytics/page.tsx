@@ -274,7 +274,9 @@ export default function AnalyticsPage() {
 
   const totalEvents    = data?.total_events ?? 0;
   const criticalCount  = data?.events_by_severity.find(r => r.severity === "critical")?.count ?? 0;
-  const failureCount   = data?.outcome_breakdown.find(r => r.outcome === "failure" || r.outcome === "denied")?.count ?? 0;
+  const failureCount   = data?.outcome_breakdown
+    .filter(r => r.outcome === "failure" || r.outcome === "denied")
+    .reduce((sum, r) => sum + r.count, 0) ?? 0;
   const catTotal       = data?.events_by_category.reduce((s, r) => s + r.count, 0) ?? 1;
   const sevTotal       = data?.events_by_severity.reduce((s, r) => s + r.count, 0) ?? 1;
   const outcomeTotal   = data?.outcome_breakdown.reduce((s, r) => s + r.count, 0) ?? 1;

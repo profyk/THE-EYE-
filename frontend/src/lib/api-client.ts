@@ -2,7 +2,7 @@ import { EventRead, EventSearchParams } from "@/types/event";
 import { clearSession, Session } from "@/lib/auth";
 export type { EventRead };
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+export const API_BASE = "";
 
 export class ApiError extends Error {
   status: number;

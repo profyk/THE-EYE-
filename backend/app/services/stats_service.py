@@ -125,7 +125,10 @@ async def get_analytics(db: AsyncSession, *, tenant_id: UUID) -> dict:
     af = agent_source_filter(tenant_id)
 
     total = (
-        await db.execute(select(func.count()).select_from(LedgerEvent).where(LedgerEvent.tenant_id == tenant_id, af))
+        await db.execute(
+            select(func.count()).select_from(LedgerEvent)
+            .where(LedgerEvent.tenant_id == tenant_id, LedgerEvent.occurred_at >= thirty_days_ago, af)
+        )
     ).scalar_one()
 
     day_rows = (
@@ -140,7 +143,7 @@ async def get_analytics(db: AsyncSession, *, tenant_id: UUID) -> dict:
     cat_rows = (
         await db.execute(
             select(LedgerEvent.event_category, func.count().label("count"))
-            .where(LedgerEvent.tenant_id == tenant_id, af)
+            .where(LedgerEvent.tenant_id == tenant_id, LedgerEvent.occurred_at >= thirty_days_ago, af)
             .group_by(LedgerEvent.event_category)
             .order_by(func.count().desc())
         )
@@ -149,7 +152,7 @@ async def get_analytics(db: AsyncSession, *, tenant_id: UUID) -> dict:
     sev_rows = (
         await db.execute(
             select(LedgerEvent.severity, func.count().label("count"))
-            .where(LedgerEvent.tenant_id == tenant_id, af)
+            .where(LedgerEvent.tenant_id == tenant_id, LedgerEvent.occurred_at >= thirty_days_ago, af)
             .group_by(LedgerEvent.severity)
             .order_by(func.count().desc())
         )
@@ -158,7 +161,7 @@ async def get_analytics(db: AsyncSession, *, tenant_id: UUID) -> dict:
     type_rows = (
         await db.execute(
             select(LedgerEvent.event_type, func.count().label("count"))
-            .where(LedgerEvent.tenant_id == tenant_id, af)
+            .where(LedgerEvent.tenant_id == tenant_id, LedgerEvent.occurred_at >= thirty_days_ago, af)
             .group_by(LedgerEvent.event_type)
             .order_by(func.count().desc())
             .limit(10)
@@ -168,7 +171,7 @@ async def get_analytics(db: AsyncSession, *, tenant_id: UUID) -> dict:
     outcome_rows = (
         await db.execute(
             select(LedgerEvent.outcome, func.count().label("count"))
-            .where(LedgerEvent.tenant_id == tenant_id, af)
+            .where(LedgerEvent.tenant_id == tenant_id, LedgerEvent.occurred_at >= thirty_days_ago, af)
             .group_by(LedgerEvent.outcome)
             .order_by(func.count().desc())
         )
@@ -180,7 +183,7 @@ async def get_analytics(db: AsyncSession, *, tenant_id: UUID) -> dict:
                 func.extract("hour", LedgerEvent.occurred_at).label("hour"),
                 func.count().label("count"),
             )
-            .where(LedgerEvent.tenant_id == tenant_id, af)
+            .where(LedgerEvent.tenant_id == tenant_id, LedgerEvent.occurred_at >= thirty_days_ago, af)
             .group_by(func.extract("hour", LedgerEvent.occurred_at))
             .order_by(func.extract("hour", LedgerEvent.occurred_at))
         )
