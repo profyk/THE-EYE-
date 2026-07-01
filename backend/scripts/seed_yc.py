@@ -312,8 +312,29 @@ async def get_or_create_source(db, tenant_id) -> IngestionSource:
 async def main(tenant_id_override: str | None) -> None:
     from uuid import UUID
     from app.models.ledger_event import DEFAULT_TENANT_ID
+    from app.models.tenant import Tenant
 
-    target_tenant = UUID(tenant_id_override) if tenant_id_override else DEFAULT_TENANT_ID
+    if tenant_id_override:
+        target_tenant = UUID(tenant_id_override)
+    else:
+        async with SessionLocal() as db:
+            tenants = (
+                await db.execute(
+                    select(Tenant).where(Tenant.is_active.is_(True)).order_by(Tenant.created_at)
+                )
+            ).scalars().all()
+        real = [t for t in tenants if t.id != DEFAULT_TENANT_ID]
+        if not real:
+            print("No active tenants found. Sign up first, then re-run.")
+            return
+        if len(real) > 1:
+            print("Multiple tenants found:")
+            for t in real:
+                print(f"  {t.id}  {t.name} ({t.slug})")
+            print("Re-run with --tenant-id <uuid> to pick one.")
+            return
+        target_tenant = real[0].id
+        print(f"Auto-detected tenant: {real[0].name} ({target_tenant})")
 
     events = build_events()
     random.shuffle(events)
