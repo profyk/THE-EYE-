@@ -28,6 +28,28 @@ HOSTS = [
 IPS = ["10.0.1.10", "10.0.1.11", "10.0.2.20", "10.0.3.30", "192.168.50.5", "192.168.50.6"]
 MARCUS_IPS = ["185.220.101.45", "45.142.212.100"]
 
+# Real geo coordinates for the attacker IPs (Tor exit nodes used as demo proxies)
+MARCUS_GEO = {
+    "185.220.101.45": {"country": "Germany",     "city": "Frankfurt",   "latitude": 50.1109, "longitude": 8.6821},
+    "45.142.212.100": {"country": "Netherlands", "city": "Amsterdam",   "latitude": 52.3702, "longitude": 4.8952},
+}
+
+# Scattered auth-failure geo data to populate the world map during demo
+SCATTER_GEOS = [
+    {"country": "China",          "city": "Beijing",       "latitude": 39.9042, "longitude": 116.4074},
+    {"country": "Russia",         "city": "Moscow",        "latitude": 55.7558, "longitude": 37.6176},
+    {"country": "Brazil",         "city": "São Paulo",     "latitude": -23.5505, "longitude": -46.6333},
+    {"country": "India",          "city": "Mumbai",        "latitude": 19.0760, "longitude": 72.8777},
+    {"country": "United States",  "city": "New York",      "latitude": 40.7128, "longitude": -74.0060},
+    {"country": "Ukraine",        "city": "Kyiv",          "latitude": 50.4501, "longitude": 30.5234},
+    {"country": "Nigeria",        "city": "Lagos",         "latitude": 6.5244,  "longitude": 3.3792},
+    {"country": "Romania",        "city": "Bucharest",     "latitude": 44.4268, "longitude": 26.1025},
+    {"country": "Vietnam",        "city": "Hanoi",         "latitude": 21.0285, "longitude": 105.8542},
+    {"country": "Iran",           "city": "Tehran",        "latitude": 35.6892, "longitude": 51.3890},
+    {"country": "Turkey",         "city": "Istanbul",      "latitude": 41.0082, "longitude": 28.9784},
+    {"country": "Indonesia",      "city": "Jakarta",       "latitude": -6.2088, "longitude": 106.8456},
+]
+
 STAFF = [
     ("sarah.kim",     "user",            "Sarah Kim"),
     ("james.okonkwo", "user",            "James Okonkwo"),
@@ -113,13 +135,15 @@ def build_demo_events() -> list[EventCreate]:
                                actor_id, actor_type, display,
                                "auth.logout", "authentication", "success"))
 
-    # Occasional auth failures
-    for _ in range(40):
+    # Occasional auth failures — with scattered geo data for the world map
+    for i in range(40):
         day = random.randint(2, 30)
         actor_id, actor_type, display = random.choice(
             [a for a in STAFF if a[1] == "user" and a[0] != "marcus.webb"])
+        geo = SCATTER_GEOS[i % len(SCATTER_GEOS)]
         events.append(_ev(_biz_ts(day), actor_id, actor_type, display,
-                          "auth.login", "authentication", "failure", "warning"))
+                          "auth.login", "authentication", "failure", "warning",
+                          metadata={"seeded": True, "demo": "yc", "geo": geo}))
 
     # Data access — normal
     data_actors = [a for a in STAFF if a[0] in ("sarah.kim", "james.okonkwo", "priya.sharma")]
@@ -178,12 +202,14 @@ def build_demo_events() -> list[EventCreate]:
 
     for i in range(47):
         ts = brute_start + timedelta(minutes=i * 2)
+        ip = random.choice(MARCUS_IPS)
         events.append(_ev(ts, "marcus.webb", "user", "Marcus Webb",
                           "auth.login", "authentication", "failure",
                           "warning" if i < 20 else "high",
                           host="admin-portal.novapay.internal",
-                          ip=random.choice(MARCUS_IPS),
-                          metadata={"seeded": True, "attempt": i + 1, "demo": "yc"}))
+                          ip=ip,
+                          metadata={"seeded": True, "attempt": i + 1, "demo": "yc",
+                                    "geo": MARCUS_GEO[ip]}))
 
     events.append(_ev(brute_start + timedelta(minutes=95),
                       "marcus.webb", "user", "Marcus Webb",

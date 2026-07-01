@@ -67,25 +67,44 @@ async def get_intrusion_stats(db: AsyncSession, *, tenant_id: UUID) -> dict:
     rows = (await db.execute(stmt)).scalars().all()
 
     country_counts: Counter[str] = Counter()
+    ip_data: dict[str, dict] = {}
     attempts = []
+
     for row in rows:
         geo = (row.metadata_ or {}).get("geo") or {}
         country = geo.get("country") or "Unknown"
+        ip_str = str(row.origin_ip) if row.origin_ip else None
+
         country_counts[country] += 1
+
+        if ip_str:
+            if ip_str not in ip_data:
+                ip_data[ip_str] = {"count": 0, "country": country, "city": geo.get("city")}
+            ip_data[ip_str]["count"] += 1
+
         attempts.append(
             {
-                "ip": str(row.origin_ip) if row.origin_ip else None,
+                "ip": ip_str,
                 "country": country,
                 "city": geo.get("city"),
                 "latitude": geo.get("latitude"),
                 "longitude": geo.get("longitude"),
                 "event_type": row.event_type,
+                "actor_id": row.actor_id if row.actor_id != "unknown" else None,
                 "occurred_at": row.occurred_at,
             }
         )
 
+    top_ips = sorted(
+        [{"ip": ip, **data} for ip, data in ip_data.items()],
+        key=lambda d: d["count"],
+        reverse=True,
+    )[:20]
+
     return {
         "total_attempts": len(rows),
+        "unique_ips": len(ip_data),
         "countries": [{"country": c, "count": n} for c, n in country_counts.most_common()],
+        "top_ips": top_ips,
         "attempts": attempts,
     }

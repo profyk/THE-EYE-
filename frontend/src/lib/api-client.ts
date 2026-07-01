@@ -309,11 +309,20 @@ export interface IntrusionAttempt {
   latitude: number | null;
   longitude: number | null;
   event_type: string;
+  actor_id: string | null;
   occurred_at: string;
+}
+export interface TopIp {
+  ip: string;
+  count: number;
+  country: string;
+  city: string | null;
 }
 export interface IntrusionStats {
   total_attempts: number;
+  unique_ips: number;
   countries: { country: string; count: number }[];
+  top_ips: TopIp[];
   attempts: IntrusionAttempt[];
 }
 
