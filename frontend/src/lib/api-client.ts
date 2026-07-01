@@ -24,6 +24,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (res.status === 401) {
     clearSession();
+    if (typeof window !== "undefined") {
+      window.location.replace("/login");
+    }
   }
   if (!res.ok) {
     const body = await res.text();
