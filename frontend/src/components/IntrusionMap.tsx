@@ -171,7 +171,7 @@ export default function IntrusionMap({ attempts }: Props) {
           const { x, y } = project(d.lat, d.lon);
           const r = Math.min(3 + Math.sqrt(d.count) * 2, 14);
           const label = d.attempts[0];
-          const tip = `${label.city ?? ""}${label.city ? ", " : ""}${label.attempts[0].country} — ${d.count} attempt${d.count > 1 ? "s" : ""}${label.ip ? ` from ${label.ip}` : ""}`;
+          const tip = `${label.city ?? ""}${label.city ? ", " : ""}${label.country} — ${d.count} attempt${d.count > 1 ? "s" : ""}${label.ip ? ` from ${label.ip}` : ""}`;
           return (
             <g key={i} filter="url(#glow)">
               {/* Pulse ring */}
