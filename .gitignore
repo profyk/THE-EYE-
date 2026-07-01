@@ -17,6 +17,9 @@ build/
 frontend/node_modules/
 frontend/.next/
 frontend/out/
+staff-portal/node_modules/
+staff-portal/.next/
+staff-portal/out/
 
 # Editors / OS
 .vscode/
