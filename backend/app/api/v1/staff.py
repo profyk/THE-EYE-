@@ -789,21 +789,37 @@ async def delete_announcement(ann_id: UUID, db: AsyncSession = Depends(get_db)) 
 
 # ── Tenant deletion queue ─────────────────────────────────────────────────────
 
+from app.core.security import verify_password
+from app.models.staff_audit_log import StaffAuditLog
+from app.services.staff_audit_service import log_staff_action
+
+
 class DeletionQueueItem(BaseModel):
     id: str
     name: str
     slug: str
     deletion_requested_at: datetime
     deletion_reason: str | None
+    scheduled_deletion_at: datetime | None
     user_count: int
     contact_email: str | None
 
     model_config = {"from_attributes": True}
 
 
+class ApprovalBody(BaseModel):
+    password: str
+    reason: str = Field(min_length=1, max_length=2000)
+    scheduled_at: datetime | None = None
+
+
+class RejectionBody(BaseModel):
+    password: str
+    reason: str = Field(min_length=1, max_length=2000)
+
+
 @router.get("/deletion-queue", response_model=list[DeletionQueueItem])
 async def list_deletion_queue(db: AsyncSession = Depends(get_db)) -> list[DeletionQueueItem]:
-    """All tenants with pending_deletion=True awaiting staff approval."""
     tenants = list((await db.execute(
         select(Tenant).where(Tenant.pending_deletion == True)  # noqa: E712
         .order_by(Tenant.deletion_requested_at.asc())
@@ -819,54 +835,209 @@ async def list_deletion_queue(db: AsyncSession = Depends(get_db)) -> list[Deleti
             slug=t.slug,
             deletion_requested_at=t.deletion_requested_at,
             deletion_reason=t.deletion_reason,
+            scheduled_deletion_at=t.scheduled_deletion_at,
             user_count=user_count,
             contact_email=t.contact_email,
         ))
     return result
 
 
+async def _hard_delete_tenant(db: AsyncSession, tenant: Tenant, tenant_id: UUID) -> None:
+    for u in list((await db.execute(select(User).where(User.tenant_id == tenant_id))).scalars().all()):
+        await db.delete(u)
+    for k in list((await db.execute(select(ApiKey).where(ApiKey.tenant_id == tenant_id))).scalars().all()):
+        await db.delete(k)
+    for n in list((await db.execute(select(StaffNote).where(StaffNote.tenant_id == tenant_id))).scalars().all()):
+        await db.delete(n)
+    await db.delete(tenant)
+
+
 @router.post("/deletion-queue/{tenant_id}/approve", status_code=status.HTTP_200_OK)
-async def approve_tenant_deletion(tenant_id: UUID, db: AsyncSession = Depends(get_db)) -> dict:
-    """Permanently delete the tenant, all its users, API keys, and notes."""
+async def approve_tenant_deletion(
+    tenant_id: UUID,
+    body: ApprovalBody,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    # Verify actor password
+    if not verify_password(body.password, current_user.password_hash, current_user.salt):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect password.")
+
     tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
     if not tenant:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Tenant not found.")
     if not tenant.pending_deletion:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Tenant does not have a pending deletion request.")
 
-    # Hard delete users
-    users_to_delete = list((await db.execute(select(User).where(User.tenant_id == tenant_id))).scalars().all())
-    for u in users_to_delete:
-        await db.delete(u)
+    tenant_name = tenant.name
 
-    # Hard delete API keys
-    keys_to_delete = list((await db.execute(select(ApiKey).where(ApiKey.tenant_id == tenant_id))).scalars().all())
-    for k in keys_to_delete:
-        await db.delete(k)
+    if body.scheduled_at:
+        # Schedule for later
+        tenant.scheduled_deletion_at = body.scheduled_at
+        await log_staff_action(
+            db, current_user, "tenant.deletion.scheduled",
+            target_type="tenant", target_id=str(tenant_id), target_name=tenant_name,
+            reason=body.reason, severity="warning",
+            details={"scheduled_at": body.scheduled_at.isoformat()},
+        )
+        await db.commit()
+        return {"ok": True, "tenant_id": str(tenant_id), "action": "scheduled", "scheduled_at": body.scheduled_at.isoformat()}
 
-    # Hard delete support notes
-    notes_to_delete = list((await db.execute(select(StaffNote).where(StaffNote.tenant_id == tenant_id))).scalars().all())
-    for n in notes_to_delete:
-        await db.delete(n)
-
-    # Hard delete the tenant itself (events remain — they have no FK to tenant)
-    await db.delete(tenant)
+    # Immediate hard delete
+    await log_staff_action(
+        db, current_user, "tenant.deletion.approved",
+        target_type="tenant", target_id=str(tenant_id), target_name=tenant_name,
+        reason=body.reason, severity="critical",
+        details={"immediate": True},
+    )
+    await _hard_delete_tenant(db, tenant, tenant_id)
     await db.commit()
     return {"ok": True, "tenant_id": str(tenant_id), "action": "deleted"}
 
 
 @router.post("/deletion-queue/{tenant_id}/reject", status_code=status.HTTP_200_OK)
-async def reject_tenant_deletion(tenant_id: UUID, db: AsyncSession = Depends(get_db)) -> dict:
-    """Reject the deletion: reactivate tenant and clear the pending state."""
+async def reject_tenant_deletion(
+    tenant_id: UUID,
+    body: RejectionBody,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    if not verify_password(body.password, current_user.password_hash, current_user.salt):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect password.")
+
     tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
     if not tenant:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Tenant not found.")
     if not tenant.pending_deletion:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Tenant does not have a pending deletion request.")
 
+    await log_staff_action(
+        db, current_user, "tenant.deletion.rejected",
+        target_type="tenant", target_id=str(tenant_id), target_name=tenant.name,
+        reason=body.reason, severity="warning",
+    )
     tenant.pending_deletion = False
     tenant.deletion_requested_at = None
     tenant.deletion_reason = None
+    tenant.scheduled_deletion_at = None
     tenant.is_active = True
     await db.commit()
     return {"ok": True, "tenant_id": str(tenant_id), "action": "rejected"}
+
+
+@router.post("/deletion-queue/{tenant_id}/execute", status_code=status.HTTP_200_OK)
+async def execute_scheduled_deletion(
+    tenant_id: UUID,
+    body: ApprovalBody,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Execute a previously scheduled deletion immediately."""
+    if not verify_password(body.password, current_user.password_hash, current_user.salt):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect password.")
+
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Tenant not found.")
+    if not tenant.pending_deletion:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Tenant does not have a pending deletion request.")
+
+    tenant_name = tenant.name
+    await log_staff_action(
+        db, current_user, "tenant.deletion.executed",
+        target_type="tenant", target_id=str(tenant_id), target_name=tenant_name,
+        reason=body.reason, severity="critical",
+        details={"was_scheduled": tenant.scheduled_deletion_at is not None},
+    )
+    await _hard_delete_tenant(db, tenant, tenant_id)
+    await db.commit()
+    return {"ok": True, "tenant_id": str(tenant_id), "action": "deleted"}
+
+
+# ── Staff audit log ───────────────────────────────────────────────────────────
+
+class AuditLogEntry(BaseModel):
+    id: str
+    occurred_at: datetime
+    actor_username: str
+    action: str
+    target_type: str | None
+    target_id: str | None
+    target_name: str | None
+    reason: str | None
+    severity: str
+    details: dict | None
+
+    model_config = {"from_attributes": True}
+
+
+class AuditLogStats(BaseModel):
+    total: int
+    critical: int
+    warning: int
+    info: int
+    last_24h: int
+    actions_breakdown: list[dict]
+
+
+@router.get("/audit-log", response_model=list[AuditLogEntry])
+async def list_audit_log(
+    db: AsyncSession = Depends(get_db),
+    limit: int = 200,
+    offset: int = 0,
+    severity: str | None = None,
+    action: str | None = None,
+    actor: str | None = None,
+) -> list[AuditLogEntry]:
+    q = select(StaffAuditLog).order_by(StaffAuditLog.occurred_at.desc())
+    if severity:
+        q = q.where(StaffAuditLog.severity == severity)
+    if action:
+        q = q.where(StaffAuditLog.action.ilike(f"%{action}%"))
+    if actor:
+        q = q.where(StaffAuditLog.actor_username.ilike(f"%{actor}%"))
+    q = q.offset(offset).limit(limit)
+    rows = list((await db.execute(q)).scalars().all())
+    return [
+        AuditLogEntry(
+            id=str(r.id),
+            occurred_at=r.occurred_at,
+            actor_username=r.actor_username,
+            action=r.action,
+            target_type=r.target_type,
+            target_id=r.target_id,
+            target_name=r.target_name,
+            reason=r.reason,
+            severity=r.severity,
+            details=r.details,
+        )
+        for r in rows
+    ]
+
+
+@router.get("/audit-log/stats", response_model=AuditLogStats)
+async def get_audit_log_stats(db: AsyncSession = Depends(get_db)) -> AuditLogStats:
+    cutoff_24h = datetime.now(timezone.utc) - timedelta(hours=24)
+    total = (await db.execute(select(func.count()).select_from(StaffAuditLog))).scalar_one()
+    critical = (await db.execute(
+        select(func.count()).select_from(StaffAuditLog).where(StaffAuditLog.severity == "critical")
+    )).scalar_one()
+    warning = (await db.execute(
+        select(func.count()).select_from(StaffAuditLog).where(StaffAuditLog.severity == "warning")
+    )).scalar_one()
+    info = (await db.execute(
+        select(func.count()).select_from(StaffAuditLog).where(StaffAuditLog.severity == "info")
+    )).scalar_one()
+    last_24h = (await db.execute(
+        select(func.count()).select_from(StaffAuditLog).where(StaffAuditLog.occurred_at >= cutoff_24h)
+    )).scalar_one()
+    action_rows = list((await db.execute(
+        select(StaffAuditLog.action, func.count().label("cnt"))
+        .group_by(StaffAuditLog.action)
+        .order_by(func.count().desc())
+        .limit(10)
+    )).all())
+    return AuditLogStats(
+        total=total, critical=critical, warning=warning, info=info, last_24h=last_24h,
+        actions_breakdown=[{"action": r.action, "count": r.cnt} for r in action_rows],
+    )

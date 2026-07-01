@@ -33,6 +33,7 @@ class Tenant(Base):
     pending_deletion: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     deletion_requested_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
     deletion_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    scheduled_deletion_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
 
     contact_email: Mapped[str | None] = mapped_column(String(256), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(64), nullable=True)

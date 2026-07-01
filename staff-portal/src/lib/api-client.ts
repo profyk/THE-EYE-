@@ -347,6 +347,7 @@ export interface DeletionQueueItem {
   slug: string;
   deletion_requested_at: string;
   deletion_reason: string | null;
+  scheduled_deletion_at: string | null;
   user_count: number;
   contact_email: string | null;
 }
@@ -355,10 +356,81 @@ export async function getDeletionQueue(): Promise<DeletionQueueItem[]> {
   return request<DeletionQueueItem[]>("/v1/staff/deletion-queue");
 }
 
-export async function approveTenantDeletion(tenantId: string): Promise<void> {
-  await request<void>(`/v1/staff/deletion-queue/${tenantId}/approve`, { method: "POST" });
+export async function approveTenantDeletion(
+  tenantId: string,
+  password: string,
+  reason: string,
+  scheduledAt?: string,
+): Promise<{ action: string; scheduled_at?: string }> {
+  return request(`/v1/staff/deletion-queue/${tenantId}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ password, reason, scheduled_at: scheduledAt ?? null }),
+  });
 }
 
-export async function rejectTenantDeletion(tenantId: string): Promise<void> {
-  await request<void>(`/v1/staff/deletion-queue/${tenantId}/reject`, { method: "POST" });
+export async function rejectTenantDeletion(
+  tenantId: string,
+  password: string,
+  reason: string,
+): Promise<void> {
+  await request<void>(`/v1/staff/deletion-queue/${tenantId}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ password, reason }),
+  });
+}
+
+export async function executeScheduledDeletion(
+  tenantId: string,
+  password: string,
+  reason: string,
+): Promise<void> {
+  await request<void>(`/v1/staff/deletion-queue/${tenantId}/execute`, {
+    method: "POST",
+    body: JSON.stringify({ password, reason }),
+  });
+}
+
+// ── Staff audit log ───────────────────────────────────────────────────────────
+
+export interface AuditLogEntry {
+  id: string;
+  occurred_at: string;
+  actor_username: string;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  target_name: string | null;
+  reason: string | null;
+  severity: "info" | "warning" | "critical";
+  details: Record<string, unknown> | null;
+}
+
+export interface AuditLogStats {
+  total: number;
+  critical: number;
+  warning: number;
+  info: number;
+  last_24h: number;
+  actions_breakdown: { action: string; count: number }[];
+}
+
+export async function getAuditLog(params?: {
+  limit?: number;
+  offset?: number;
+  severity?: string;
+  action?: string;
+  actor?: string;
+}): Promise<AuditLogEntry[]> {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  if (params?.severity) qs.set("severity", params.severity);
+  if (params?.action) qs.set("action", params.action);
+  if (params?.actor) qs.set("actor", params.actor);
+  const query = qs.toString() ? `?${qs}` : "";
+  return request<AuditLogEntry[]>(`/v1/staff/audit-log${query}`);
+}
+
+export async function getAuditLogStats(): Promise<AuditLogStats> {
+  return request<AuditLogStats>("/v1/staff/audit-log/stats");
 }
