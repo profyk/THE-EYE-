@@ -1,38 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import NavBar from "@/components/NavBar";
 import { useRequireAuth } from "@/lib/useRequireAuth";
-import { getSession } from "@/lib/auth";
 import {
   getPublicPlans,
   getTenantSubscription,
-  getBillingConfig,
+  createCheckout,
   Plan,
   SubscriptionOut,
   ApiError,
 } from "@/lib/api-client";
-
-// ── Paddle.js v2 types ────────────────────────────────────────────────────────
-declare global {
-  interface Window {
-    Paddle?: {
-      Setup: (opts: {
-        token: string;
-        environment?: string;
-        eventCallback?: (ev: { name: string; data?: Record<string, unknown> }) => void;
-      }) => void;
-      Checkout: {
-        open: (opts: {
-          items: { priceId: string; quantity: number }[];
-          customer?: { email?: string };
-          customData?: Record<string, string>;
-          settings?: { displayMode?: string };
-        }) => void;
-      };
-    };
-  }
-}
 
 const STATUS_COLOR: Record<string, string> = {
   active:    "text-[var(--safe)]   bg-[var(--safe)]/10   border-[var(--safe)]/20",
@@ -173,60 +151,11 @@ function PlanCard({
 
 export default function BillingPage() {
   const ready = useRequireAuth();
-  const session = getSession();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [sub, setSub] = useState<SubscriptionOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "info" | "error" | "success" } | null>(null);
-  const paddleReady = useRef(false);
-
-  // Load and initialise Paddle.js v2
-  useEffect(() => {
-    if (paddleReady.current) return;
-    getBillingConfig()
-      .then(({ client_token, environment }) => {
-        if (!client_token) return;
-        const existing = document.getElementById("paddle-js");
-        if (existing) {
-          initPaddle(client_token, environment);
-          return;
-        }
-        const script = document.createElement("script");
-        script.id = "paddle-js";
-        script.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
-        script.onload = () => initPaddle(client_token, environment);
-        document.head.appendChild(script);
-      })
-      .catch(() => { /* Paddle not configured — checkout will show a helpful error */ });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function initPaddle(token: string, env: string) {
-    if (!window.Paddle) return;
-    window.Paddle.Setup({
-      token,
-      ...(env === "sandbox" ? { environment: "sandbox" } : {}),
-      eventCallback: (ev) => {
-        if (ev.name === "checkout.completed") {
-          setCheckoutLoading(null);
-          setMessage({
-            text: "Payment successful! Your subscription is being activated — please refresh in a moment.",
-            type: "success",
-          });
-          getTenantSubscription().then(setSub).catch(() => null);
-        }
-        if (ev.name === "checkout.closed") {
-          setCheckoutLoading(null);
-        }
-        if (ev.name === "checkout.error") {
-          setCheckoutLoading(null);
-          setMessage({ text: "Checkout error. Please try again or contact support.", type: "error" });
-        }
-      },
-    });
-    paddleReady.current = true;
-  }
 
   useEffect(() => {
     if (!ready) return;
@@ -240,33 +169,31 @@ export default function BillingPage() {
     });
   }, [ready]);
 
-  function handleSubscribe(plan: Plan, cycle: "monthly" | "annual") {
+  async function handleSubscribe(plan: Plan, cycle: "monthly" | "annual") {
     setMessage(null);
-    const priceId = cycle === "annual" ? plan.paddle_price_id_annual : plan.paddle_price_id_monthly;
-
-    if (!priceId) {
-      setMessage({ text: "Payment not yet configured for this plan. Contact support.", type: "error" });
-      return;
-    }
-    if (!window.Paddle || !paddleReady.current) {
-      setMessage({ text: "Payment system is loading — please wait a moment and try again.", type: "error" });
-      return;
-    }
-
     setCheckoutLoading(plan.id + cycle);
     try {
-      window.Paddle.Checkout.open({
-        items: [{ priceId, quantity: 1 }],
-        customer: session?.username?.includes("@") ? { email: session.username } : undefined,
-        customData: {
-          tenant_id: sub?.tenant_id ?? "",
-          plan_id: plan.id,
-        },
-        settings: { displayMode: "overlay" },
+      const result = await createCheckout(plan.id, cycle);
+      if (result.contact_sales) {
+        setMessage({
+          text: result.message || "Contact our sales team to set up this plan.",
+          type: "info",
+        });
+        return;
+      }
+      if (result.checkout_url) {
+        // Redirect to Paddle-hosted checkout page
+        window.location.href = result.checkout_url;
+        return;
+      }
+      setMessage({ text: "Unexpected response from payment server. Please try again.", type: "error" });
+    } catch (e: unknown) {
+      setMessage({
+        text: e instanceof ApiError ? e.message : "Failed to start checkout. Please try again.",
+        type: "error",
       });
-    } catch {
+    } finally {
       setCheckoutLoading(null);
-      setMessage({ text: "Failed to open checkout. Please try again.", type: "error" });
     }
   }
 
