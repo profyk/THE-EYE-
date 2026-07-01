@@ -254,6 +254,9 @@ class TenantProfileOut(BaseModel):
     industry: str | None
     logo_url: str | None
     profile_description: str | None
+    pending_deletion: bool = False
+    deletion_requested_at: str | None = None
+    deletion_reason: str | None = None
 
 
 class TenantProfileUpdate(BaseModel):
@@ -282,6 +285,9 @@ async def get_tenant_profile(
         website=tenant.website, country=tenant.country,
         industry=tenant.industry, logo_url=tenant.logo_url,
         profile_description=tenant.profile_description,
+        pending_deletion=tenant.pending_deletion,
+        deletion_requested_at=tenant.deletion_requested_at.isoformat() if tenant.deletion_requested_at else None,
+        deletion_reason=tenant.deletion_reason,
     )
 
 
@@ -307,4 +313,7 @@ async def update_tenant_profile(
         website=tenant.website, country=tenant.country,
         industry=tenant.industry, logo_url=tenant.logo_url,
         profile_description=tenant.profile_description,
+        pending_deletion=tenant.pending_deletion,
+        deletion_requested_at=tenant.deletion_requested_at.isoformat() if tenant.deletion_requested_at else None,
+        deletion_reason=tenant.deletion_reason,
     )

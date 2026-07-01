@@ -616,6 +616,9 @@ export interface TenantProfile {
   contact_email: string | null; phone: string | null; website: string | null;
   country: string | null; industry: string | null; logo_url: string | null;
   profile_description: string | null;
+  pending_deletion: boolean;
+  deletion_requested_at: string | null;
+  deletion_reason: string | null;
 }
 export async function getTenantProfile(): Promise<TenantProfile> {
   return request<TenantProfile>("/v1/billing/profile");
@@ -625,6 +628,19 @@ export async function updateTenantProfile(data: Partial<Omit<TenantProfile, "id"
     method: "PATCH",
     body: JSON.stringify(data),
   });
+}
+
+// ── Account deletion ──────────────────────────────────────────────────────────
+
+export async function requestAccountDeletion(password: string, reason: string): Promise<void> {
+  await request<void>("/v1/account/request-deletion", {
+    method: "POST",
+    body: JSON.stringify({ password, reason }),
+  });
+}
+
+export async function cancelAccountDeletion(): Promise<void> {
+  await request<void>("/v1/account/request-deletion", { method: "DELETE" });
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────

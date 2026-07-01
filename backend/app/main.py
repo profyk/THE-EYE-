@@ -5,6 +5,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1 import (
+    account,
     agent,
     alerts,
     api_keys,
@@ -115,6 +116,7 @@ async def _generic_500_handler(request: Request, exc: Exception) -> JSONResponse
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, _generic_500_handler)
 
+app.include_router(account.router)
 app.include_router(events.router)
 app.include_router(file_activity.router)
 app.include_router(sources.router)

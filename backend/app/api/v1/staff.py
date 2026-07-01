@@ -785,3 +785,88 @@ async def delete_announcement(ann_id: UUID, db: AsyncSession = Depends(get_db)) 
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Announcement not found")
     await db.delete(ann)
     await db.commit()
+
+
+# ── Tenant deletion queue ─────────────────────────────────────────────────────
+
+class DeletionQueueItem(BaseModel):
+    id: str
+    name: str
+    slug: str
+    deletion_requested_at: datetime
+    deletion_reason: str | None
+    user_count: int
+    contact_email: str | None
+
+    model_config = {"from_attributes": True}
+
+
+@router.get("/deletion-queue", response_model=list[DeletionQueueItem])
+async def list_deletion_queue(db: AsyncSession = Depends(get_db)) -> list[DeletionQueueItem]:
+    """All tenants with pending_deletion=True awaiting staff approval."""
+    tenants = list((await db.execute(
+        select(Tenant).where(Tenant.pending_deletion == True)  # noqa: E712
+        .order_by(Tenant.deletion_requested_at.asc())
+    )).scalars().all())
+    result = []
+    for t in tenants:
+        user_count = (await db.execute(
+            select(func.count()).select_from(User).where(User.tenant_id == t.id)
+        )).scalar_one()
+        result.append(DeletionQueueItem(
+            id=str(t.id),
+            name=t.name,
+            slug=t.slug,
+            deletion_requested_at=t.deletion_requested_at,
+            deletion_reason=t.deletion_reason,
+            user_count=user_count,
+            contact_email=t.contact_email,
+        ))
+    return result
+
+
+@router.post("/deletion-queue/{tenant_id}/approve", status_code=status.HTTP_200_OK)
+async def approve_tenant_deletion(tenant_id: UUID, db: AsyncSession = Depends(get_db)) -> dict:
+    """Permanently delete the tenant, all its users, API keys, and notes."""
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Tenant not found.")
+    if not tenant.pending_deletion:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Tenant does not have a pending deletion request.")
+
+    # Hard delete users
+    users_to_delete = list((await db.execute(select(User).where(User.tenant_id == tenant_id))).scalars().all())
+    for u in users_to_delete:
+        await db.delete(u)
+
+    # Hard delete API keys
+    keys_to_delete = list((await db.execute(select(ApiKey).where(ApiKey.tenant_id == tenant_id))).scalars().all())
+    for k in keys_to_delete:
+        await db.delete(k)
+
+    # Hard delete support notes
+    notes_to_delete = list((await db.execute(select(StaffNote).where(StaffNote.tenant_id == tenant_id))).scalars().all())
+    for n in notes_to_delete:
+        await db.delete(n)
+
+    # Hard delete the tenant itself (events remain — they have no FK to tenant)
+    await db.delete(tenant)
+    await db.commit()
+    return {"ok": True, "tenant_id": str(tenant_id), "action": "deleted"}
+
+
+@router.post("/deletion-queue/{tenant_id}/reject", status_code=status.HTTP_200_OK)
+async def reject_tenant_deletion(tenant_id: UUID, db: AsyncSession = Depends(get_db)) -> dict:
+    """Reject the deletion: reactivate tenant and clear the pending state."""
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Tenant not found.")
+    if not tenant.pending_deletion:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Tenant does not have a pending deletion request.")
+
+    tenant.pending_deletion = False
+    tenant.deletion_requested_at = None
+    tenant.deletion_reason = None
+    tenant.is_active = True
+    await db.commit()
+    return {"ok": True, "tenant_id": str(tenant_id), "action": "rejected"}

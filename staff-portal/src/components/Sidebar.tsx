@@ -22,6 +22,7 @@ const ICONS = {
   tenants:       I(["M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z", "M9 22V12h6v10"]),
   users:         I(["M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2", "M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"]),
   apikeys:       I(["M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"]),
+  deletion:      I(["M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2", "M10 11v6M14 11v6"]),
   billing:       I(["M12 2v20M17 5H9.5a3.5 3.5 0 100 7h5a3.5 3.5 0 110 7H6"]),
   subscriptions: I(["M20 12V22H4V12", "M22 7H2v5h20V7z", "M12 22V7", "M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z", "M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"]),
   plans:         I(["M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2z", "M7 7h.01"]),
@@ -42,9 +43,10 @@ const GROUPS: NavGroup[] = [
   {
     title: "Clients",
     items: [
-      { label: "Tenants",   href: "/tenants",  icon: ICONS.tenants },
-      { label: "All Users", href: "/users",    icon: ICONS.users },
-      { label: "API Keys",  href: "/api-keys", icon: ICONS.apikeys },
+      { label: "Tenants",           href: "/tenants",           icon: ICONS.tenants },
+      { label: "All Users",         href: "/users",             icon: ICONS.users },
+      { label: "API Keys",          href: "/api-keys",          icon: ICONS.apikeys },
+      { label: "Deletion Requests", href: "/deletion-requests", icon: ICONS.deletion },
     ],
   },
   {

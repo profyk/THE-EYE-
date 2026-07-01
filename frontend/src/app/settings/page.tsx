@@ -11,7 +11,7 @@ import { applyTheme, initialTheme, Theme } from "@/lib/theme";
 import {
   getChainSummary, getTenantSubscription, listUsers, createUser,
   deactivateUser, resetUserPassword, getTenantProfile, updateTenantProfile,
-  changePassword,
+  changePassword, requestAccountDeletion, cancelAccountDeletion,
   ApiError, ChainSummary, SubscriptionOut, UserRead, TenantProfile,
 } from "@/lib/api-client";
 
@@ -571,63 +571,212 @@ function TeamPanel({ isAdmin }: { isAdmin: boolean }) {
 
 // ── Danger Zone ───────────────────────────────────────────────────────────────
 
-function DangerZone() {
-  const [confirm, setConfirm] = useState("");
-  const [open, setOpen] = useState(false);
+type DeletionStep = "idle" | "password" | "confirm" | "pending";
 
+function DangerZone({ profile }: { profile: Partial<TenantProfile> | null }) {
+  const [step, setStep] = useState<DeletionStep>(
+    profile?.pending_deletion ? "pending" : "idle"
+  );
+  const [password, setPassword] = useState("");
+  const [reason, setReason]     = useState("");
+  const [confirmText, setConfirmText] = useState("");
+  const [showPw, setShowPw]     = useState(false);
+  const [busy, setBusy]         = useState(false);
+  const [err, setErr]           = useState<string | null>(null);
+
+  // Sync from loaded profile
+  useEffect(() => {
+    if (profile?.pending_deletion) setStep("pending");
+  }, [profile?.pending_deletion]);
+
+  async function submitRequest() {
+    if (confirmText !== "DELETE") return;
+    setBusy(true); setErr(null);
+    try {
+      await requestAccountDeletion(password, reason || "Account deletion requested by admin");
+      setStep("pending");
+      setPassword(""); setConfirmText(""); setReason("");
+    } catch (e: unknown) {
+      setErr(e instanceof ApiError ? e.message : "Request failed. Please try again.");
+    } finally { setBusy(false); }
+  }
+
+  async function cancelRequest() {
+    setBusy(true); setErr(null);
+    try {
+      await cancelAccountDeletion();
+      setStep("idle");
+    } catch (e: unknown) {
+      setErr(e instanceof ApiError ? e.message : "Cancel failed. Please try again.");
+    } finally { setBusy(false); }
+  }
+
+  // ── Pending banner ────────────────────────────────────────────────────────
+  if (step === "pending") {
+    const requestedAt = profile?.deletion_requested_at
+      ? new Date(profile.deletion_requested_at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })
+      : "recently";
+    return (
+      <div className="space-y-4">
+        <Panel className="border-[var(--danger)]/50 bg-[var(--danger)]/5">
+          <div className="px-5 py-4 flex items-start gap-4">
+            <div className="w-10 h-10 rounded-full bg-[var(--danger)]/15 flex items-center justify-center shrink-0">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--danger-color, #ef4444)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-[var(--danger)]">Account Deletion Pending</p>
+              <p className="text-xs text-[var(--muted)] mt-1">
+                Deletion request submitted {requestedAt}. Your account is suspended and awaiting staff approval. All data is preserved until permanently approved.
+              </p>
+              {profile?.deletion_reason && (
+                <p className="text-xs text-[var(--muted)] mt-1 italic">Reason: {profile.deletion_reason}</p>
+              )}
+            </div>
+          </div>
+          {err && <p className="px-5 pb-3 text-xs text-[var(--danger)]">{err}</p>}
+          <div className="px-5 pb-4">
+            <button
+              onClick={cancelRequest}
+              disabled={busy}
+              className="text-sm font-semibold text-[var(--text)] border border-[var(--border)] bg-[var(--panel)] px-4 py-2 rounded-lg hover:border-[var(--accent)]/40 hover:text-[var(--accent)] transition-colors disabled:opacity-50"
+            >
+              {busy ? "Cancelling…" : "Cancel Deletion Request"}
+            </button>
+          </div>
+        </Panel>
+      </div>
+    );
+  }
+
+  // ── Normal danger zone ────────────────────────────────────────────────────
   return (
-    <Panel className="border-[var(--danger)]/30">
-      <div className="px-5 py-4 border-b border-[var(--border)]">
-        <p className="text-sm font-semibold text-[var(--danger)]">Danger Zone</p>
-        <p className="text-xs text-[var(--muted)] mt-0.5">Irreversible actions — proceed with caution</p>
-      </div>
-      <div className="divide-y divide-[var(--border)]/60">
-        <div className="px-5 py-4 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-[var(--text)]">Export All Events</p>
-            <p className="text-xs text-[var(--muted)] mt-0.5">Download your full audit log via Forensics</p>
-          </div>
-          <Link href="/forensics" className="text-sm font-semibold text-[var(--accent)] hover:underline">Go to Forensics →</Link>
+    <div className="space-y-4">
+      <Panel className="border-[var(--danger)]/30">
+        <div className="px-5 py-4 border-b border-[var(--border)]">
+          <p className="text-sm font-semibold text-[var(--danger)]">Danger Zone</p>
+          <p className="text-xs text-[var(--muted)] mt-0.5">Irreversible actions — proceed with caution</p>
         </div>
-        <div className="px-5 py-4 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-[var(--text)]">Delete Account</p>
-            <p className="text-xs text-[var(--muted)] mt-0.5">Permanently remove your organisation and all data</p>
+        <div className="divide-y divide-[var(--border)]/60">
+          <div className="px-5 py-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-[var(--text)]">Export All Events</p>
+              <p className="text-xs text-[var(--muted)] mt-0.5">Download your full audit log via Forensics</p>
+            </div>
+            <Link href="/forensics" className="text-sm font-semibold text-[var(--accent)] hover:underline">Go to Forensics →</Link>
           </div>
-          <button onClick={() => setOpen(true)}
-            className="text-sm font-semibold text-[var(--danger)] border border-[var(--danger)]/30 px-3 py-1.5 rounded-lg hover:bg-[var(--danger)]/10 transition-colors">
-            Delete…
-          </button>
+          <div className="px-5 py-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-[var(--text)]">Delete Account</p>
+              <p className="text-xs text-[var(--muted)] mt-0.5">Suspend your account and request permanent deletion by staff</p>
+            </div>
+            <button
+              onClick={() => { setStep("password"); setErr(null); }}
+              className="text-sm font-semibold text-[var(--danger)] border border-[var(--danger)]/30 px-3 py-1.5 rounded-lg hover:bg-[var(--danger)]/10 transition-colors"
+            >
+              Delete…
+            </button>
+          </div>
         </div>
-      </div>
+      </Panel>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-[var(--panel)] border border-[var(--border)] rounded-xl p-6 w-full max-w-sm shadow-2xl">
-            <h3 className="font-semibold text-[var(--danger)] mb-2">Delete Account</h3>
-            <p className="text-sm text-[var(--muted)] mb-4">
-              To proceed, contact{" "}
-              <a href="mailto:support@theeye.com" className="text-[var(--accent)] hover:underline">support@theeye.com</a>{" "}
-              with your organisation name. Our team will guide you through the data deletion process in compliance with your retention policy.
-            </p>
-            <p className="text-xs text-[var(--muted)] mb-3">Type <strong>DELETE</strong> to acknowledge:</p>
-            <input className={inputCls} placeholder="DELETE" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-            <div className="flex gap-2 mt-4">
-              <a href="mailto:support@theeye.com?subject=Account Deletion Request"
-                className={`flex-1 py-2 rounded-lg text-sm font-semibold text-center transition-colors ${
-                  confirm === "DELETE" ? "bg-[var(--danger)] text-white hover:bg-[var(--danger)]/90" : "bg-[var(--surface)] text-[var(--muted)] cursor-not-allowed pointer-events-none"
-                }`}>
-                Contact Support
-              </a>
-              <button onClick={() => { setOpen(false); setConfirm(""); }}
+      {/* Step 1 — password + reason */}
+      {step === "password" && (
+        <Panel>
+          <div className="px-5 py-4 border-b border-[var(--border)]">
+            <p className="text-sm font-semibold text-[var(--text)]">Step 1 of 2 — Verify Identity</p>
+            <p className="text-xs text-[var(--muted)] mt-0.5">Enter your password to confirm you authorise this request</p>
+          </div>
+          <div className="px-5 py-4 space-y-3">
+            {err && <p className="text-xs text-[var(--danger)]">{err}</p>}
+            <div className="relative">
+              <input
+                type={showPw ? "text" : "password"}
+                placeholder="Current password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`${inputCls} pr-10`}
+              />
+              <button type="button" tabIndex={-1} onClick={() => setShowPw((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--text)]">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  {showPw
+                    ? <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></>
+                    : <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>
+                  }
+                </svg>
+              </button>
+            </div>
+            <textarea
+              placeholder="Reason for deletion (optional)"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={2}
+              className={`${inputCls} resize-none`}
+            />
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => { if (password.length > 0) { setStep("confirm"); setErr(null); } }}
+                disabled={password.length === 0}
+                className="flex-1 py-2 rounded-lg bg-[var(--danger)] text-white text-sm font-semibold hover:bg-[var(--danger)]/90 disabled:opacity-40 transition-colors"
+              >
+                Continue
+              </button>
+              <button onClick={() => { setStep("idle"); setPassword(""); setReason(""); setErr(null); }}
                 className="px-4 py-2 rounded-lg border border-[var(--border)] text-sm text-[var(--muted)] hover:text-[var(--text)] transition-colors">
                 Cancel
               </button>
             </div>
           </div>
-        </div>
+        </Panel>
       )}
-    </Panel>
+
+      {/* Step 2 — final confirmation */}
+      {step === "confirm" && (
+        <Panel className="border-[var(--danger)]/40">
+          <div className="px-5 py-4 border-b border-[var(--border)] bg-[var(--danger)]/5">
+            <p className="text-sm font-semibold text-[var(--danger)]">Step 2 of 2 — Final Confirmation</p>
+            <p className="text-xs text-[var(--muted)] mt-0.5">Your account will be suspended immediately. Staff will review and permanently delete your data.</p>
+          </div>
+          <div className="px-5 py-4 space-y-3">
+            {err && <p className="text-xs text-[var(--danger)]">{err}</p>}
+            <div className="bg-[var(--danger)]/5 border border-[var(--danger)]/20 rounded-lg px-4 py-3 space-y-1">
+              <p className="text-xs font-semibold text-[var(--danger)]">What happens next:</p>
+              <ul className="text-xs text-[var(--muted)] space-y-0.5 list-disc list-inside">
+                <li>Your account is suspended immediately</li>
+                <li>All team members will lose access</li>
+                <li>Staff will review and confirm deletion</li>
+                <li>All data is permanently erased after approval</li>
+                <li>This cannot be undone once staff approves</li>
+              </ul>
+            </div>
+            <div>
+              <p className="text-xs text-[var(--muted)] mb-1.5">Type <strong>DELETE</strong> to confirm:</p>
+              <input
+                className={`${inputCls} ${confirmText.length > 0 && confirmText !== "DELETE" ? "border-[var(--danger)]/60" : ""}`}
+                placeholder="DELETE"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={submitRequest}
+                disabled={busy || confirmText !== "DELETE"}
+                className="flex-1 py-2 rounded-lg bg-[var(--danger)] text-white text-sm font-semibold hover:bg-[var(--danger)]/90 disabled:opacity-40 transition-colors"
+              >
+                {busy ? "Submitting…" : "Submit Deletion Request"}
+              </button>
+              <button onClick={() => { setStep("idle"); setPassword(""); setReason(""); setConfirmText(""); setErr(null); }}
+                className="px-4 py-2 rounded-lg border border-[var(--border)] text-sm text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Panel>
+      )}
+    </div>
   );
 }
 
@@ -640,11 +789,13 @@ export default function SettingsPage() {
 
   const [sub, setSub] = useState<SubscriptionOut | null>(null);
   const [chain, setChain] = useState<ChainSummary | null>(null);
+  const [profile, setProfile] = useState<TenantProfile | null>(null);
 
   useEffect(() => {
     if (!ready) return;
     getChainSummary().then(setChain).catch(() => null);
     getTenantSubscription().then(setSub).catch(() => null);
+    getTenantProfile().then(setProfile).catch(() => null);
   }, [ready]);
 
   if (!ready) return null;
@@ -847,7 +998,7 @@ export default function SettingsPage() {
         {isAdmin && (
           <section>
             <SectionHeader title="Danger Zone" />
-            <DangerZone />
+            <DangerZone profile={profile} />
           </section>
         )}
 

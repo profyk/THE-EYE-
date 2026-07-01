@@ -338,3 +338,27 @@ export async function toggleAnnouncement(id: string, is_active: boolean): Promis
 export async function deleteAnnouncement(id: string): Promise<void> {
   await request<void>(`/v1/staff/announcements/${id}`, { method: "DELETE" });
 }
+
+// ── Tenant deletion queue ─────────────────────────────────────────────────────
+
+export interface DeletionQueueItem {
+  id: string;
+  name: string;
+  slug: string;
+  deletion_requested_at: string;
+  deletion_reason: string | null;
+  user_count: number;
+  contact_email: string | null;
+}
+
+export async function getDeletionQueue(): Promise<DeletionQueueItem[]> {
+  return request<DeletionQueueItem[]>("/v1/staff/deletion-queue");
+}
+
+export async function approveTenantDeletion(tenantId: string): Promise<void> {
+  await request<void>(`/v1/staff/deletion-queue/${tenantId}/approve`, { method: "POST" });
+}
+
+export async function rejectTenantDeletion(tenantId: string): Promise<void> {
+  await request<void>(`/v1/staff/deletion-queue/${tenantId}/reject`, { method: "POST" });
+}
