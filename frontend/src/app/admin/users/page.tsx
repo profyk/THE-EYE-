@@ -62,7 +62,7 @@ function StatusBadge({ active }: { active: boolean }) {
 export default function UsersAdminPage() {
   const ready = useRequireAuth();
   const session = getSession();
-  const myId = session?.id as string | undefined;
+  const myUsername = session?.username;
 
   const [users, setUsers] = useState<UserRead[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -219,7 +219,7 @@ export default function UsersAdminPage() {
 
           <div className="divide-y divide-[var(--border)]">
             {users.map(u => {
-              const isSelf = u.id === myId;
+              const isSelf = u.username === myUsername;
               const isLastAdmin = u.role === "admin" && u.is_active && activeAdmins.length <= 1;
               const busy = loadingId === u.id || savingRoleId === u.id;
 
