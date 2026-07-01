@@ -5,7 +5,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db
+from pydantic import BaseModel
+from app.api.deps import get_current_user, get_db
 from app.config import settings
 from app.core.rate_limit import check_rate_limit
 from app.core.request_utils import get_client_ip
@@ -15,7 +16,8 @@ from app.schemas.event import EventCreate
 from app.schemas.user import LoginRequest, LoginResponse
 from app.services.geoip_service import lookup_geoip
 from app.services.source_service import get_source_by_name
-from app.services.user_service import authenticate_user, create_session, delete_session_by_token, get_user_by_username, get_user_by_session_token
+from app.models.user import User
+from app.services.user_service import authenticate_user, create_session, delete_session_by_token, get_user_by_username, get_user_by_session_token, set_user_password
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
 
@@ -136,3 +138,28 @@ async def logout(request: Request, response: Response, db: AsyncSession = Depend
         secure=settings.cookie_secure,
         samesite=settings.cookie_samesite,
     )
+
+
+# ── Change password ───────────────────────────────────────────────────────────
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.post("/change-password", status_code=status.HTTP_200_OK)
+async def change_password(
+    data: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    from app.core.security import verify_password, validate_password_strength
+    if not verify_password(data.current_password, current_user.password_hash, current_user.password_salt):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Current password is incorrect.")
+    err = validate_password_strength(data.new_password, settings.password_min_length)
+    if err:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, err)
+    if data.current_password == data.new_password:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "New password must differ from current password.")
+    await set_user_password(db, current_user, data.new_password)
+    return {"ok": True}

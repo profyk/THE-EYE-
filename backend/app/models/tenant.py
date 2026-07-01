@@ -30,6 +30,14 @@ class Tenant(Base):
         nullable=True,
     )
 
+    contact_email: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    website: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    industry: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    profile_description: Mapped[str | None] = mapped_column(String, nullable=True)
+
     api_keys: Mapped[list["ApiKey"]] = relationship(
         back_populates="tenant", cascade="all, delete-orphan", lazy="selectin"
     )

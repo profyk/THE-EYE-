@@ -9,7 +9,7 @@ import json
 import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,6 +42,8 @@ class PlanOut(BaseModel):
     is_public: bool
     sort_order: int
     has_paddle: bool
+    paddle_price_id_monthly: str | None = None
+    paddle_price_id_annual: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -83,6 +85,8 @@ def _plan_out(p: Plan) -> PlanOut:
         is_public=p.is_public,
         sort_order=p.sort_order,
         has_paddle=bool(p.paddle_price_id_monthly or p.paddle_price_id_annual),
+        paddle_price_id_monthly=p.paddle_price_id_monthly,
+        paddle_price_id_annual=p.paddle_price_id_annual,
     )
 
 
@@ -223,3 +227,84 @@ async def paddle_webhook(
             pass
 
     return {"ok": True, "event_type": event_type}
+
+
+# ── Paddle client config (public) ─────────────────────────────────────────────
+
+@router.get("/config")
+async def get_billing_config() -> dict:
+    """Returns Paddle.js client token and environment. Safe to expose — client
+    token is not the API key and cannot make server-side Paddle API calls."""
+    return {
+        "client_token": settings.paddle_client_token,
+        "environment": settings.paddle_environment,
+    }
+
+
+# ── Tenant profile ─────────────────────────────────────────────────────────────
+
+class TenantProfileOut(BaseModel):
+    id: str
+    name: str
+    slug: str
+    contact_email: str | None
+    phone: str | None
+    website: str | None
+    country: str | None
+    industry: str | None
+    logo_url: str | None
+    profile_description: str | None
+
+
+class TenantProfileUpdate(BaseModel):
+    name: str | None = Field(default=None, max_length=255)
+    contact_email: str | None = Field(default=None, max_length=256)
+    phone: str | None = Field(default=None, max_length=64)
+    website: str | None = Field(default=None, max_length=256)
+    country: str | None = Field(default=None, max_length=64)
+    industry: str | None = Field(default=None, max_length=128)
+    logo_url: str | None = Field(default=None, max_length=512)
+    profile_description: str | None = None
+
+
+@router.get("/profile", response_model=TenantProfileOut)
+async def get_tenant_profile(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> TenantProfileOut:
+    _require_tenant(current_user)
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == current_user.tenant_id))).scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Tenant not found.")
+    return TenantProfileOut(
+        id=str(tenant.id), name=tenant.name, slug=tenant.slug,
+        contact_email=tenant.contact_email, phone=tenant.phone,
+        website=tenant.website, country=tenant.country,
+        industry=tenant.industry, logo_url=tenant.logo_url,
+        profile_description=tenant.profile_description,
+    )
+
+
+@router.patch("/profile", response_model=TenantProfileOut)
+async def update_tenant_profile(
+    data: TenantProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> TenantProfileOut:
+    if current_user.role != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin role required.")
+    _require_tenant(current_user)
+    tenant = (await db.execute(select(Tenant).where(Tenant.id == current_user.tenant_id))).scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Tenant not found.")
+    for field, val in data.model_dump(exclude_none=True).items():
+        setattr(tenant, field, val)
+    await db.commit()
+    await db.refresh(tenant)
+    return TenantProfileOut(
+        id=str(tenant.id), name=tenant.name, slug=tenant.slug,
+        contact_email=tenant.contact_email, phone=tenant.phone,
+        website=tenant.website, country=tenant.country,
+        industry=tenant.industry, logo_url=tenant.logo_url,
+        profile_description=tenant.profile_description,
+    )

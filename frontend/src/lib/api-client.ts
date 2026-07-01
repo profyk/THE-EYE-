@@ -471,6 +471,8 @@ export interface Plan {
   is_public: boolean;
   sort_order: number;
   has_paddle: boolean;
+  paddle_price_id_monthly: string | null;
+  paddle_price_id_annual: string | null;
 }
 
 export interface SubscriptionOut {
@@ -600,4 +602,36 @@ export async function getEventFlags(eventId: string): Promise<EventFlag[]> {
 
 export async function deleteFlag(eventId: string, flagId: string): Promise<void> {
   return request<void>(`/v1/events/${eventId}/flags/${flagId}`, { method: "DELETE" });
+}
+
+// ── Paddle / Billing ──────────────────────────────────────────────────────────
+
+export interface BillingConfig { client_token: string; environment: string; }
+export async function getBillingConfig(): Promise<BillingConfig> {
+  return request<BillingConfig>("/v1/billing/config");
+}
+
+export interface TenantProfile {
+  id: string; name: string; slug: string;
+  contact_email: string | null; phone: string | null; website: string | null;
+  country: string | null; industry: string | null; logo_url: string | null;
+  profile_description: string | null;
+}
+export async function getTenantProfile(): Promise<TenantProfile> {
+  return request<TenantProfile>("/v1/billing/profile");
+}
+export async function updateTenantProfile(data: Partial<Omit<TenantProfile, "id" | "slug">>): Promise<TenantProfile> {
+  return request<TenantProfile>("/v1/billing/profile", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await request<void>("/v1/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
 }
