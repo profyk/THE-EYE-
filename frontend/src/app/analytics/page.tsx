@@ -258,7 +258,15 @@ export default function AnalyticsPage() {
     setLoading(true);
     getAnalytics()
       .then(setData)
-      .catch((e: unknown) => setError(e instanceof ApiError ? e.message : "Failed to load analytics"))
+      .catch((e: unknown) => {
+        if (e instanceof ApiError) {
+          setError(`${e.status}: ${e.message}`);
+        } else if (e instanceof Error) {
+          setError(`${e.name}: ${e.message}`);
+        } else {
+          setError(String(e));
+        }
+      })
       .finally(() => setLoading(false));
   }, [ready]);
 

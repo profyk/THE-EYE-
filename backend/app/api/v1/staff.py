@@ -860,7 +860,7 @@ async def approve_tenant_deletion(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     # Verify actor password
-    if not verify_password(body.password, current_user.password_hash, current_user.salt):
+    if not verify_password(body.password, current_user.password_hash, current_user.password_salt):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect password.")
 
     tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
@@ -902,7 +902,7 @@ async def reject_tenant_deletion(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    if not verify_password(body.password, current_user.password_hash, current_user.salt):
+    if not verify_password(body.password, current_user.password_hash, current_user.password_salt):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect password.")
 
     tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
@@ -933,7 +933,7 @@ async def execute_scheduled_deletion(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     """Execute a previously scheduled deletion immediately."""
-    if not verify_password(body.password, current_user.password_hash, current_user.salt):
+    if not verify_password(body.password, current_user.password_hash, current_user.password_salt):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect password.")
 
     tenant = (await db.execute(select(Tenant).where(Tenant.id == tenant_id))).scalar_one_or_none()
