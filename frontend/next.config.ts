@@ -2,21 +2,15 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  // Pin the workspace root explicitly -- Turbopack's root inference walks up
+  // parent directories looking for lockfiles and can land on an unrelated one
+  // (e.g. elsewhere under the user's home directory), which breaks the build.
   turbopack: {
     root: path.resolve(__dirname),
   },
-  // Proxy all /v1/* API calls to the backend server-side.
-  // This avoids CORS entirely and means the session cookie lives on the
-  // Vercel domain — no NEXT_PUBLIC_ env var needed in the client bundle.
-  async rewrites() {
-    const apiBase = process.env.API_BASE_URL ?? "http://localhost:8000";
-    return [
-      {
-        source: "/v1/:path*",
-        destination: `${apiBase}/v1/:path*`,
-      },
-    ];
-  },
+  // Content-Security-Policy moved to middleware.ts -- it needs a fresh nonce
+  // per request (for Next's own inline hydration scripts), which a static
+  // header here can't provide.
   async headers() {
     return [
       {
